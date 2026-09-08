@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from typing import AsyncIterator, Dict, List, Optional
 
 from starlette.applications import Starlette
@@ -54,6 +55,7 @@ from .link import Link, image_of, text_of
 # backslashes through a shell heredoc: nothing errors, the text is just no
 # longer the text that was written.
 PAGE = r"""<!doctype html>
+<html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AIHawk</title>
@@ -251,7 +253,11 @@ form{ padding:var(--s3) var(--s4) var(--s4); border-top:1px solid var(--line-1);
 #i{ flex:1; background:transparent; border:0; outline:none; resize:none; color:var(--fg);
     font:var(--t-body)/1.55 var(--sans); min-height:24px; max-height:200px;
     overflow-y:hidden; padding:0; caret-color:var(--accent) }
-#i::placeholder{ color:var(--fg-4) }
+/* --fg-3 and not --fg-4: the placeholder is the only hint the composer gives,
+   so it is text that has to be read, and --fg-4 sits at 2.2:1 against 4.5:1.
+   The step numbers keep --fg-4, which is what it was picked for: decoration
+   beside a label that carries the meaning. */
+#i::placeholder{ color:var(--fg-3) }
 #go, #halt{ width:32px; height:32px; flex:none; border:0; border-radius:50%; display:grid;
      place-items:center; cursor:pointer; background:var(--accent);
      box-shadow:inset 0 1px 0 rgba(255,255,255,.22);
@@ -374,8 +380,9 @@ form{ padding:var(--s3) var(--s4) var(--s4); border-top:1px solid var(--line-1);
   </div>
   <button id="jump" hidden type="button">jump to latest</button>
   <form id="f" autocomplete="off">
-    <span id="chip" hidden>1 message queued <span aria-hidden="true">&#9998;</span></span>
+    <button id="chip" type="button" hidden>1 message queued <span aria-hidden="true">&#9998;</span></button>
     <div class="composer">
+      <label class="sr" for="i">What should the agent do?</label>
       <textarea id="i" rows="1" placeholder="What should the agent do?"></textarea>
       <button id="go" type="submit" aria-label="Send" disabled>
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
@@ -642,6 +649,11 @@ function wipe(){
   turn = null; live = null; hold = null; n = 0;
   clearInterval(timer);
   $('tok').hidden = true;
+  /* Idle until told otherwise. On a reconnection the server sends this wipe
+     first and the run state after it, so a page that reconnects to a RESTARTED
+     process stops believing in a run that died with the old one - which
+     otherwise left the composer saying "queue for next turn" forever. */
+  busyNow = false;
   queued = null; paint();
 }
 fresh.onclick = () => fetch('/chat/fresh', {method:'POST'});
@@ -792,6 +804,13 @@ class ChatService:
         self.model_label = model_label
         self._busy = asyncio.Lock()
         self._task: Optional[asyncio.Task] = None
+        #: Which conversation the history belongs to. A reconnecting page says
+        #: how far it got with `Last-Event-ID`, and that position only means
+        #: something inside one conversation: after a reset, or after the
+        #: process restarts, the same number points at a different transcript.
+        #: Counted from the clock so a restart cannot collide with the run
+        #: before it.
+        self._epoch = str(int(time.time() * 1000))
 
     def subscribe(self) -> asyncio.Queue:
         q: asyncio.Queue = asyncio.Queue()
@@ -838,7 +857,23 @@ class ChatService:
         if callable(forget):
             forget()
         self.history.clear()
+        self._epoch = str(int(time.time() * 1000))
         return True
+
+    @property
+    def epoch(self) -> str:
+        """Which transcript the history positions belong to."""
+        return self._epoch
+
+    @property
+    def usage(self) -> dict:
+        """What the meter would show right now, for a listener joining late.
+
+        Read through the brain rather than kept here: the brain owns the
+        transcript, so it owns what the transcript has cost.
+        """
+        got = getattr(self._brain, "usage", None)
+        return dict(got) if isinstance(got, dict) else {}
 
     @property
     def busy(self) -> bool:
@@ -917,25 +952,56 @@ def build_app(link: Link, service: ChatService) -> Starlette:
             await service.emit("fresh", "1")
         return JSONResponse({"fresh": done})
 
-    async def events(_request: Request) -> StreamingResponse:
+    async def events(request: Request) -> StreamingResponse:
         q = service.subscribe()
         # Freeze the replay/live boundary while subscribing. StreamingResponse
         # starts `stream` later, so taking this snapshot inside it would let an
         # intervening event appear in both history and the listener's queue.
-        replay = list(service.history)
+        history = list(service.history)
         # Taken with the snapshot, for the same reason: whether a run is in
         # flight is part of the state this listener is joining.
         joining_a_run = service.busy
+        current_usage = service.usage
+
+        # ⛔ WHERE THIS LISTENER GOT TO, AND WHETHER IT IS EVEN THE SAME
+        # CONVERSATION. `EventSource` reconnects by itself after any drop, and
+        # until this was read the server answered every reconnection with the
+        # whole transcript again, while the page - which has no de-duplication
+        # and had never been given an id to resume from - appended a second
+        # copy of everything. Measured: three consecutive subscriptions each
+        # received all 21 events of the same conversation.
+        #
+        # The epoch is the other half. A position only means something inside
+        # one transcript: after a reset, or after the process restarts, the
+        # same number points at something else entirely, so a mismatch replays
+        # from the beginning - and says `fresh` first, so a page holding the
+        # previous conversation drops it instead of growing a chimera.
+        resume_from, same_conversation = 0, False
+        marker = request.headers.get("last-event-id") or ""
+        if ":" in marker:
+            epoch, _, index = marker.partition(":")
+            if epoch == service.epoch and index.isdigit():
+                resume_from = int(index) + 1
+                same_conversation = True
+        replay = history[resume_from:] if same_conversation else history
 
         async def stream() -> AsyncIterator[bytes]:
             try:
                 yield b"data: " + json.dumps(
                     {"kind": "model", "text": service.model_label}).encode() + b"\n\n"
+                if not same_conversation and marker:
+                    # It reconnected carrying a position from another
+                    # transcript, so what it is still showing is not this one.
+                    yield b"data: " + json.dumps(
+                        {"kind": "fresh", "text": "1"}).encode() + b"\n\n"
                 # Flagged as replay so the page does not animate forty rows at
                 # once and does not start a stopwatch on work that finished
-                # before this listener existed.
-                for past in replay:
-                    yield b"data: " + json.dumps({**past, "replay": True}).encode() + b"\n\n"
+                # before this listener existed. Numbered so the next
+                # reconnection can say where it got to instead of starting over.
+                for offset, past in enumerate(replay):
+                    yield (b"id: " + ("%s:%d" % (service.epoch, resume_from + offset)).encode()
+                           + b"\ndata: " + json.dumps({**past, "replay": True}).encode()
+                           + b"\n\n")
                 # And then the CURRENT state, which the replay above cannot
                 # carry: `emit` keeps `busy` out of the history on purpose, so a
                 # page opened long after a run would not show a spinner for work
@@ -948,9 +1014,25 @@ def build_app(link: Link, service: ChatService) -> Starlette:
                 if joining_a_run:
                     yield b"data: " + json.dumps(
                         {"kind": "busy", "text": "1"}).encode() + b"\n\n"
+                # The meter is state too, and it was silent for exactly the
+                # same reason: a page joining after a turn ended showed no
+                # context size at all, on the one screen whose whole job is to
+                # say how big the transcript has become.
+                if current_usage.get("calls"):
+                    yield b"data: " + json.dumps(
+                        {"kind": "usage", "text": json.dumps(current_usage)}).encode() + b"\n\n"
                 while True:
                     event = await q.get()
-                    yield b"data: " + json.dumps(event).encode() + b"\n\n"
+                    # Only what the history keeps is numbered: an id moves the
+                    # resume point, and `busy` or `usage` are not places to
+                    # resume from. Leaving the field out keeps the last one,
+                    # which is what the spec says and what is wanted here.
+                    if event["kind"] in ("busy", "usage", "fresh"):
+                        yield b"data: " + json.dumps(event).encode() + b"\n\n"
+                    else:
+                        yield (b"id: " + ("%s:%d" % (service.epoch,
+                                                     len(service.history) - 1)).encode()
+                               + b"\ndata: " + json.dumps(event).encode() + b"\n\n")
             finally:
                 service.unsubscribe(q)
 
