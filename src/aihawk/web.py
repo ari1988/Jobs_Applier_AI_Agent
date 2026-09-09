@@ -130,10 +130,29 @@ PAGE = r"""<!doctype html>
      accessibility guidance marks `font-size: 16px` "Don't" and `1rem` "Do" for
      exactly this. Same pixels at the default 16px root, so nothing moves for
      anybody who never changed it. */
-  --t-label:.6875rem; --t-mono:.8125rem; --t-ui:.8125rem; --t-body:.875rem;
-  /* Steps that read as steps: 17 and 15 sat a single pixel apart from the body
-     under them, so the hierarchy was carried by weight alone. */
-  --t-h1:1.125rem; --t-h2:1rem; --t-h3:.8125rem;       /* the answer's headings */
+  /* ⛔ ONE RATIO, AND THE STEPS ARE STEPS. Measured on the running page, the
+     left column drew NINE size/weight pairs at 11, 12, 13, 14 and 16px: four
+     sizes inside three pixels, which is a scale in name only. A step of 1.08
+     is not a step - the eye reads it as an accident - and the fix is not more
+     sizes but fewer, with weight and colour carrying the tiers that size no
+     longer does.
+
+     Three prose steps on ~1.2: 12 / 15 / 18. Body is 15 because this column
+     exists to be read and 14 is under the floor every source gives for reading
+     text. */
+  --t-label:.75rem;                            /* 12 - labels, meta, counts */
+  --t-body:.9375rem;                           /* 15 - prose, and the base */
+  --t-ui:.9375rem;                             /* 15 - chrome reads as prose */
+  /* ⛔ MONO IS OFF THIS SCALE BY DECISION, NOT BY OVERSIGHT. A mono face runs
+     wider and reads larger at the same pixel, so it does not belong on a scale
+     built for a proportional one - and the step track is MEASURED against it:
+     `LONG` is how many characters fit in 416px at this size, so moving it moves
+     a threshold that a gate checks. It is the data face, and it says so here. */
+  --t-mono:.8125rem;                           /* 13 - steps, code, addresses */
+  /* The answer's headings. One size above the body, then weight and colour:
+     three sizes a pixel apart carried nothing that 600 and a quieter ink do
+     not carry better. `--t-h1` is the off-screen page heading's size too. */
+  --t-h1:1.125rem; --t-h2:.9375rem; --t-h3:.9375rem;
 
   --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:20px; --s6:32px;
   --r-sm:4px; --r:8px; --r-lg:12px; --r-pill:999px;
@@ -149,13 +168,13 @@ PAGE = r"""<!doctype html>
 body{ margin:0; height:100vh; display:flex; position:relative;
       background:var(--base); color:var(--fg);
       font:var(--t-body)/1.55 var(--sans); }
-code,pre,.g,.meta,.badge,#url,#tok{
+code,pre,.g,.meta,.badge,#url{
   font-family:var(--mono);
   /* Not cosmetic: a step reads `#email <- ada@example.com`, and a mono face with
      contextual alternates draws `<-` as one arrow. The text on screen would stop
      being the text the model emitted. */
   font-variant-ligatures:none; }
-.meta,.g,#tok{ font-variant-numeric:tabular-nums }
+.meta,.g{ font-variant-numeric:tabular-nums }
 /* ⛔ `--fg-4` IS DECLARED DECORATIVE AT 2.4:1 AND THIS CLASS PUT WORDS ON IT.
    Measured on the running page: the state beside the browser read at 2.23:1,
    the meter at 2.71, the placeholder inside a screen at 2.51, the layout icons
@@ -258,8 +277,11 @@ code,pre,.g,.meta,.badge,#url,#tok{
    whole box with it, so the border and the accent below would be drawn on the
    edge away from the column instead of the one beside it - correct in the
    element's own coordinates and backwards on the screen. */
+/* On the label step like every other tracked uppercase word on the page: it
+   was the last size in this column that belonged to no scale. The tracking
+   stays wider than `.label` because the letters are stacked, not set. */
 #railtab span{ writing-mode:vertical-rl; transform:rotate(180deg);
-               font:600 .875rem/1 var(--sans); letter-spacing:.2em;
+               font:600 var(--t-label)/1 var(--sans); letter-spacing:.2em;
                text-transform:uppercase }
 #railtab:hover{ background:var(--raised); color:var(--fg) }
 /* Open: the spine lifts a rung and the word goes to full ink. The state is
@@ -354,6 +376,32 @@ code,pre,.g,.meta,.badge,#url,#tok{
 #split:focus-visible{ outline:none }
 #split:focus-visible::after, #split[data-drag]::after{ background:var(--accent); width:2px }
 #right{ flex:1; min-width:0; display:flex; flex-direction:column; background:var(--well) }
+/* ⛔ UNDER 720px THE TWO PANES STOP BEING SIDE BY SIDE, or the right one is
+   allotted nothing and its bar spills out of the window. Measured in a frame
+   320px wide, which is what WCAG 1.4.10 asks a layout to survive: the document
+   scrolled sideways to 482px, the conversation was squeezed to 270 and the
+   browser pane was FOUR HUNDRED AND EIGHTY-TWO minus everything, which is to
+   say zero, with the Live/Frozen pair and the layout picker drawn past the
+   edge of the screen.
+
+   Stacked, both halves keep a full width and the page scrolls in one direction
+   only. The spine stays where it is - it belongs to the frame, and that was
+   decided - so it keeps the conversation company on the first row.
+
+   ⛔ AND THE MEASUREMENT NEEDED A REAL VIEWPORT. The `zoom` property scales
+   what is drawn and does NOT move the CSS viewport, so media queries do not
+   fire under it: a first pass "at 400%" reported a failure that was an artefact
+   of the instrument. An iframe of a fixed width has a viewport of its own, and
+   that is what these numbers come from. */
+@media (max-width:720px){
+  body{ flex-wrap:wrap }
+  /* `min-width:0` or the pane refuses to go under its content's own minimum,
+     the flex line overflows, and the pane wraps to a row of its own - leaving
+     the spine alone above it as a 93px stub with the word clipped inside. */
+  #left{ width:calc(100% - var(--spine)); min-width:0; height:60vh }
+  #split{ display:none }
+  #right{ flex:1 0 100%; height:40vh }
+}
 /* Three groups and not four things in a row: the name, then what this
    conversation is costing and running, then the one thing you can do to it.
    The rule that separates the last is the same hairline the panes use. */
@@ -362,6 +410,15 @@ code,pre,.g,.meta,.badge,#url,#tok{
         border-bottom:1px solid var(--line-1) }
 #head .vr{ width:1px; height:18px; flex:none; background:var(--line-2);
            margin:0 var(--s1) }
+/* ⛔ THE GROUP STAYS ON THE RIGHT, AND THE THING THAT KEPT IT THERE WAS THE
+   METER. `margin-left:auto` lived on the meter, so removing it dropped the
+   model and Clear against the left edge, under the transcript's own margin and
+   nowhere near the edge they had always sat on. The push belongs to the first
+   of whatever survives, not to whichever element happened to be there. */
+#head #model{ margin-left:auto }
+/* The heading is out of flow (`.sr` is absolute), so it is not one of the
+   things being pushed, and this rule only describes the size it is announced
+   at rather than drawn at. */
 #head h1{ margin:0; font-size:var(--t-ui); font-weight:600 }
 .badge{ font-size:var(--t-label); color:var(--fg-2);
         background:var(--raised); border:1px solid var(--line-2);
@@ -431,7 +488,7 @@ code,pre,.g,.meta,.badge,#url,#tok{
 #hint .eg{ font:var(--t-mono)/1.9 var(--mono); color:var(--fg-2);
            background:var(--raised); border:1px solid var(--line-1);
            border-radius:var(--r); padding:var(--s3) var(--s4); text-align:left }
-#hint .sm{ font-size:.75rem; color:var(--fg-3) }
+#hint .sm{ font-size:var(--t-label); color:var(--fg-3) }
 
 #jump{ position:absolute; bottom:100%; margin-bottom:var(--s2);
        left:50%; transform:translateX(-50%); z-index:2;
@@ -486,8 +543,8 @@ h3.md-h, h4.md-h, h5.md-h, h6.md-h{
    heading and not as a bold line: at 14px it was the size of the body text
    under it, which is a hierarchy only the weight was carrying. */
 h3.md-h{ font-size:var(--t-h1) }
-h4.md-h{ font-size:var(--t-h2) }
-h5.md-h, h6.md-h{ font-size:var(--t-h3); color:var(--fg-2) }
+h4.md-h{ font-size:var(--t-h2); font-weight:600 }
+h5.md-h, h6.md-h{ font-size:var(--t-h3); font-weight:600; color:var(--fg-2) }
 /* A fenced block inside an answer is already inside the answer's indent, and
    `.out` carries its own for the tool output it was written for: the two
    stacked, so code sat a step to the right of the prose describing it. */
@@ -634,8 +691,6 @@ form{ position:relative; padding:var(--s3) var(--s4) var(--s4);
        background:var(--hover); border:1px solid var(--line-2); color:var(--fg-2);
        font-size:var(--t-label); padding:3px 9px; border-radius:var(--r-pill);
        cursor:pointer }
-#tok{ margin-left:auto; display:inline-flex; align-items:center; gap:6px;
-      font-size:var(--t-label); color:var(--fg-3) }
 
 /* ---------------- browser pane ---------------- */
 /* The strip only exists when there is more than one tab: a single tab labelled
@@ -663,8 +718,19 @@ form{ position:relative; padding:var(--s3) var(--s4) var(--s4);
    50, so the top edge of the product broke by twelve pixels on its main
    seam - the one place a misalignment is read as the whole thing being
    loose rather than as one box being wrong. */
-#chrome{ flex:none; height:var(--topbar); display:flex; align-items:center;
-         gap:var(--s2); padding:0 var(--s3); background:var(--raised);
+/* ⛔ IT WRAPS, AND THE HEIGHT IS A FLOOR RATHER THAN A CEILING. Measured at
+   400% zoom, which WCAG 1.4.10 asks a layout to survive and which is the same
+   thing as a 320px window: this bar was the only place on the page that pushed
+   the document sideways. The address can shrink to nothing, but the Live/Frozen
+   pair and the layout picker cannot, so three fixed-width groups in a row on a
+   fixed 50px line had nowhere to go and went past the edge. A `height` would
+   then have clipped the second row, so it is a `min-height`: the bar is one
+   line whenever one line fits, and it is the bar's own business when it does
+   not. Found by the reflow check and not by looking - at 100% there is room,
+   so nothing shows. */
+#chrome{ flex:none; min-height:var(--topbar); display:flex; align-items:center;
+         flex-wrap:wrap; row-gap:var(--s1);
+         gap:var(--s2); padding:var(--s1) var(--s3); background:var(--raised);
          border-bottom:1px solid var(--line-1) }
 /* The honesty contract: nothing in here is interactive except what is, so
    nothing in here gets a pointer cursor except what does. */
@@ -684,7 +750,7 @@ form{ position:relative; padding:var(--s3) var(--s4) var(--s4);
    made this bar look assembled rather than designed. */
 #url{ flex:1; min-width:0; height:var(--h-ctl); line-height:calc(var(--h-ctl) - 2px);
       padding:0 var(--s3); border-radius:var(--r); background:var(--well);
-      border:1px solid var(--line-1); font-size:.75rem;
+      border:1px solid var(--line-1); font-size:var(--t-mono);
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
 /* ⛔ BOTH FORMS, BECAUSE THE INTENT LIVED IN TWO PLACES AND MATCHED IN
    NEITHER. The script sets `dim` on the address bar ITSELF when there is no
@@ -960,17 +1026,15 @@ form{ position:relative; padding:var(--s3) var(--s4) var(--s4);
 <!-- Two landmarks, so somebody moving by region can go straight to the
      conversation or to the browsers instead of walking the whole page. -->
 <main id="left" aria-label="Conversation">
-  <!-- The meter lives up here with the other things that describe the
-       conversation rather than under the box you type in. What is under the box
-       should be the box: a number that grows all session long, sitting between
-       the composer and the edge of the window, is the one place a person looks
-       twenty times an hour for something else. -->
   <div id="head">
-    <!-- ⛔ A HEADING AND NOT A BOLD WORD. The page had no h1 at all, so the
-         answers' own headings - which start at h3 on the reasoning that the
-         product's name sits above them - hung under nothing. -->
-    <h1>AIHawk</h1>
-    <span id="tok" hidden></span>
+    <!-- ⛔ THE HEADING IS OFF-SCREEN, NOT ABSENT, AND IT IS LOAD-BEARING WHERE
+         IT CANNOT BE SEEN. The answers' own headings start at h3 on the
+         reasoning that the product's name sits above them, so deleting this
+         leaves every one of them hanging under nothing and the document with no
+         outline at all. It reads as dead markup and it is not: a gate holds it
+         here. What was removed is the NAME ON THE SCREEN, which said the same
+         thing as the tab, the window and the address bar. -->
+    <h1 class="sr">AIHawk</h1>
     <span class="badge" id="model">no model</span>
     <span class="vr" aria-hidden="true"></span>
     <button id="fresh" type="button" title="Clear this conversation">Clear</button></div>
@@ -1463,7 +1527,6 @@ const onEvent = (e) => {
   const m = JSON.parse(e.data), r = m.replay;
   switch(m.kind){
     case 'model': $('model').textContent = m.text; break;
-    case 'usage': meter(m.text); break;
     /* Sent to every listener, so a second tab clears too instead of showing a
        transcript the server has already forgotten. */
     case 'fresh': wipe(); break;
@@ -1586,7 +1649,6 @@ function wipe(){
   thread.textContent = '';
   turn = null; live = null; hold = null; n = 0;
   clearInterval(timer);
-  $('tok').hidden = true;
   /* Idle until told otherwise. On a reconnection the server sends this wipe
      first and the run state after it, so a page that reconnects to a RESTARTED
      process stops believing in a run that died with the old one - which
@@ -1675,15 +1737,6 @@ f.onsubmit = (e) => {
   send(t); paint();
 };
 
-/* The meter reads the LAST turn's prompt, never a sum: every turn is sent the
-   whole transcript, so the newest prompt IS the current occupancy. */
-function meter(json){
-  let u; try { u = JSON.parse(json); } catch(err) { return; }
-  const k = v => v >= 1000 ? (v/1000).toFixed(1) + 'k' : String(v);
-  $('tok').hidden = false;
-  $('tok').textContent = k(u.last_prompt || 0) + ' ctx  /  ' +
-                         k((u.prompt || 0) + (u.completion || 0)) + ' total';
-}
 
 /* ---- the browser pane ---- */
 const right = $('right'), stateEl = $('state'), urlEl = $('url');
@@ -2591,10 +2644,10 @@ class ChatService:
 
     async def emit(self, kind: str, text: str) -> None:
         event = {"kind": kind, "text": text}
-        # `busy` and `usage` are STATE, not conversation: replaying them to
-        # somebody who opens the page later would show a spinner for work that
-        # finished an hour ago, and a meter for a turn nobody is watching.
-        if kind not in ("busy", "usage"):
+        # `busy` is STATE, not conversation: replaying it to somebody who
+        # opens the page later would show a spinner for work that finished
+        # an hour ago.
+        if kind != "busy":
             self.history.append(event)
         for q in list(self._listeners):
             q.put_nowait(event)
@@ -2635,10 +2688,13 @@ class ChatService:
 
     @property
     def usage(self) -> dict:
-        """What the meter would show right now, for a listener joining late.
+        """What this conversation has cost, for the file it is saved into.
 
         Read through the brain rather than kept here: the brain owns the
-        transcript, so it owns what the transcript has cost.
+        transcript, so it owns what the transcript has cost. It is no longer
+        sent anywhere - the meter that drew it is gone - but it is still counted
+        and still saved, so putting a number back on the screen is a question of
+        where to draw it and not of measuring it again.
         """
         got = getattr(self._brain, "usage", None)
         return dict(got) if isinstance(got, dict) else {}
@@ -2965,7 +3021,6 @@ def build_app(link: Link, sessions: "Sessions") -> Starlette:
         # Taken with the snapshot, for the same reason: whether a run is in
         # flight is part of the state this listener is joining.
         joining_a_run = service.busy
-        current_usage = service.usage
 
         # ⛔ WHERE THIS LISTENER GOT TO, AND WHETHER IT IS EVEN THE SAME
         # CONVERSATION. `EventSource` reconnects by itself after any drop, and
@@ -3039,20 +3094,13 @@ def build_app(link: Link, sessions: "Sessions") -> Starlette:
                 else:
                     yield b"data: " + json.dumps(
                         {"kind": "busy", "text": "0", "replay": True}).encode() + b"\n\n"
-                # The meter is state too, and it was silent for exactly the
-                # same reason: a page joining after a turn ended showed no
-                # context size at all, on the one screen whose whole job is to
-                # say how big the transcript has become.
-                if current_usage.get("calls"):
-                    yield b"data: " + json.dumps(
-                        {"kind": "usage", "text": json.dumps(current_usage)}).encode() + b"\n\n"
                 while True:
                     event = await q.get()
                     # Only what the history keeps is numbered: an id moves the
-                    # resume point, and `busy` or `usage` are not places to
-                    # resume from. Leaving the field out keeps the last one,
+                    # resume point, and `busy` is not a place to resume from.
+                    # Leaving the field out keeps the last one,
                     # which is what the spec says and what is wanted here.
-                    if event["kind"] in ("busy", "usage", "fresh"):
+                    if event["kind"] in ("busy", "fresh"):
                         yield b"data: " + json.dumps(event).encode() + b"\n\n"
                     else:
                         yield (b"id: " + ("%s:%d" % (service.epoch,

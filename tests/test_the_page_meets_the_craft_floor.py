@@ -20,6 +20,10 @@ from aihawk.web import PAGE
 #: comment explaining why something is not done must not read as doing it.
 CODE = re.sub(r"/\*.*?\*/", "", PAGE, flags=re.S)
 
+#: The stylesheet alone. A brace count over the whole page would count
+#: every block in the script too, and answer about the wrong thing.
+CSS = PAGE[PAGE.index("<style>"):PAGE.index("</style>")]
+
 
 def test_no_glyph_stands_in_for_an_icon():
     """⛔ AN ICON IS DRAWN. A pencil, an arrow or an emoji borrowed from the text
@@ -117,17 +121,96 @@ def test_the_surfaces_the_browser_would_have_picked_are_picked_here():
         "that draws its own" % len(off))
 
 
-def test_the_type_scale_has_steps_a_reader_can_see():
-    """Two heading sizes a single pixel apart are one size with two names: the
-    hierarchy then rests on weight alone, which is one signal doing two jobs.
+def test_the_stylesheet_closes_everything_it_opens():
+    """⛔ A MISSING BRACE DOES NOT FAIL, IT SWALLOWS. An `@media` block left
+    unclosed while being moved took every rule after it inside itself, so the
+    whole page above the breakpoint quietly lost its header height, its browser
+    bar and its composer width - and nothing went red, because a stylesheet
+    with an unbalanced brace is still one the browser parses. It was found by
+    measuring a layout whose numbers made no sense.
 
-    Known-bad: move the two headings back within a pixel of each other.
+    Counting is the whole check, and it is enough.
+
+    Known-bad: drop any closing brace.
     """
-    got = {name: float(v) for name, v in
-           re.findall(r"--t-(h1|h2|h3|body):([\d.]+)rem", CODE)}
-    assert {"h1", "h2", "body"} <= set(got), "the type scale lost a role: %s" % got
-    for big, small in (("h1", "h2"), ("h2", "body")):
-        step = (got[big] - got[small]) * 16
-        assert step >= 1.9, (
-            "%s and %s are %.1fpx apart, which is not a step anybody sees"
-            % (big, small, step))
+    css = re.sub(r"/\*.*?\*/", "", CSS, flags=re.S)
+    opened, closed = css.count("{"), css.count("}")
+    assert opened == closed, (
+        "the stylesheet opens %d blocks and closes %d, so everything after "
+        "the unclosed one is inside it" % (opened, closed))
+
+
+def test_the_narrow_layout_comes_after_the_layout_it_overrides():
+    """⛔ SAME SPECIFICITY, SO SOURCE ORDER DECIDES, and the first version of
+    this rule sat ABOVE the rules it meant to override: it changed nothing, and
+    measured as though the breakpoint did not exist.
+
+    Under 720px the two panes stack, because side by side the right one is
+    allotted nothing and its bar is drawn past the edge of the window. Measured
+    in a frame 320px wide, which is what WCAG 1.4.10 asks a layout to survive:
+    the document scrolled sideways to 482px before this rule and not at all
+    after it, at every width from 320 to 1400.
+
+    Known-bad, three: move the block above `#right`, drop the wrap, drop the
+    hidden splitter.
+    """
+    narrow = CSS.find("@media (max-width:720px)")
+    assert narrow > 0, "nothing stacks the panes when they no longer fit"
+    base = CSS.find("#right{ flex:1; min-width:0")
+    assert base > 0, "the base rule for the browser pane is gone"
+    assert narrow > base, (
+        "the narrow layout is declared before the layout it overrides, so at "
+        "equal specificity the base rule wins and the breakpoint does nothing")
+    block = CSS[narrow:CSS.index("}", CSS.index("#right{ flex:1 0 100%", narrow))]
+    for needed in ("flex-wrap:wrap", "#split{ display:none }"):
+        assert needed in block, (
+            "the stacked layout is missing %r, without which the panes do not "
+            "stack at all" % needed)
+
+def test_the_type_scale_has_steps_a_reader_can_see():
+    """⛔ EITHER THE SAME SIZE OR A REAL STEP, NEVER A HAIR APART. Measured on
+    the running page, this column drew NINE size/weight pairs at 11, 12, 13, 14
+    and 16px - four sizes inside three pixels. A 1.08 step is not read as a
+    step, it is read as an accident, and a scale that fine is a scale in name
+    only.
+
+    So two levels may share a size, and then weight or colour separates them,
+    which is the stronger signal anyway. What is forbidden is the middle: one or
+    two pixels, carrying nothing and costing a step.
+
+    This gate used to demand every pair be at least 1.9px apart, which forbade
+    the sharing as well as the hair. That was the wrong half to forbid.
+
+    Known-bad, three: put two levels one pixel apart; drop the body under the
+    reading floor; give two levels the same size AND the same weight.
+    """
+    got = {name: float(v) * 16 for name, v in
+           re.findall(r"--t-(h1|h2|h3|body|label):([\d.]+)rem", CODE)}
+    assert {"h1", "h2", "body", "label"} <= set(got), (
+        "the type scale lost a role: %s" % got)
+
+    assert got["body"] >= 15, (
+        "the body is %.0fpx on a column that exists to be read, and every "
+        "source puts the floor at 15" % got["body"])
+
+    for big, small in (("h1", "h2"), ("h2", "body"), ("body", "label")):
+        step = got[big] - got[small]
+        assert step == 0 or step >= 2, (
+            "%s and %s are %.1fpx apart: too far to be one level, too close to "
+            "read as two" % (big, small, step))
+
+    # One ratio: the distinct sizes, in order, step by a consistent amount.
+    sizes = sorted(set(got.values()))
+    for a, b in zip(sizes, sizes[1:]):
+        assert 1.15 <= b / a <= 1.35, (
+            "%.0f to %.0f is a ratio of %.2f, off the scale this page declares "
+            "(~1.2)" % (a, b, b / a))
+
+    # A level that shares a size has to say what carries it instead.
+    for role in ("h2", "h3"):
+        if got.get(role) == got["body"]:
+            rule = re.search(r"h[45]\.md-h[^{]*\{([^}]*)\}", CODE) if role == "h3" \
+                else re.search(r"h4\.md-h\{([^}]*)\}", CODE)
+            assert rule and ("font-weight" in rule.group(1)
+                             or "color" in rule.group(1)), (
+                "%s is the body's size and nothing else separates it" % role)
