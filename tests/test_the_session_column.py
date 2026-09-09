@@ -226,6 +226,77 @@ async def test_deleting_a_conversation_closes_the_browsers_that_belonged_to_it()
     assert "lavoro" not in [r["id"] for r in sessions.listing()]
 
 
+async def test_a_deleted_conversation_stays_deleted_while_a_page_is_still_open_on_it():
+    """⛔ THE DELETE WORKED AND CAME BACK ON ITS OWN. Every route resolved the id
+    with `get`, which BUILDS what it does not find, so one poll from a tab left
+    open on the deleted session declared it again - `/live/browsers` every three
+    seconds, `/live/frame` up to twenty-five times a second. Measured against
+    the running server: `forgotten:true`, the browsers closed, the file erased,
+    and the row back in the column a moment later, empty and unnamed, for as
+    long as that tab stayed open. Every visible signal said the delete had
+    failed.
+
+    Known-bad: have `named` fall back to `sessions.get` when `knows` says no.
+    """
+    link, sessions = _sessions()
+    client = await _client(sessions, link)
+    await sessions.get("lavoro").send("log in somewhere")
+
+    assert await sessions.forget("lavoro") is True
+
+    # The three questions a page left open on it goes on asking.
+    for path in ("/live/browsers?s=lavoro", "/live/tabs?s=lavoro",
+                 "/live/frame?s=lavoro"):
+        assert client.get(path).status_code == 410, (
+            "%s answered a conversation that does not exist" % path)
+    assert client.post("/chat/send?s=lavoro", json={"text": "ciao"}).status_code == 410
+    assert client.post("/sessions/rename",
+                       json={"id": "lavoro", "name": "x"}).status_code == 410, (
+        "the rename carries the id in the BODY, so it is the one route that "
+        "would go on resurrecting sessions after the eight beside it stopped")
+
+    assert "lavoro" not in [r["id"] for r in sessions.listing()], (
+        "asking about a deleted conversation brought it back")
+    assert store.load_chat("lavoro") is None
+
+
+async def test_deleting_one_that_is_already_gone_is_not_reported_as_a_refusal():
+    """⛔ `forgotten:false` HAS ONE MEANING AND IT IS "IT IS STILL RUNNING". It
+    also used to mean "there was nothing there", and the page reads it to say
+    "that session is still working, so it was not deleted" - which for a session
+    somebody else deleted a moment ago is the wrong sentence in both halves. The
+    column does not poll, so a panel left open in another tab shows that row for
+    as long as it stays open, and its cross is what the person clicks.
+
+    Known-bad: answer `store.erase_chat(...) or service is not None` again.
+    """
+    link, sessions = _sessions()
+    await sessions.get("lavoro").send("log in somewhere")
+
+    assert await sessions.forget("lavoro") is True
+    assert await sessions.forget("lavoro") is True, (
+        "deleting one that is already gone was reported as a refusal, and the "
+        "page has exactly one sentence for a refusal")
+    assert await sessions.forget("mai-esistita") is True
+
+
+async def test_a_session_known_only_by_its_browsers_can_still_be_opened():
+    """⛔ A SESSION IS A CONVERSATION AND ITS BROWSERS, AND EITHER HALF CAN BE THE
+    ONLY ONE ON DISK. An agent client that opens a browser in session `work` and
+    never touches this interface writes the browsers file and no transcript.
+    Refusing what has no transcript would have answered 410 to a session that
+    plainly exists - the same defect one step further along.
+
+    Known-bad: drop the `store.load(at)` half of `Sessions.knows`.
+    """
+    link, sessions = _sessions()
+    client = await _client(sessions, link)
+    store.save("work", {"docs": {"running": False}}, focus="docs")
+
+    assert sessions.knows("work") is True
+    assert client.get("/live/browsers?s=work").status_code == 200
+
+
 async def test_deleting_a_conversation_that_is_mid_run_is_refused():
     """The same reason clearing one is: throwing away a transcript something is
     still writing into is a surprise nobody can undo.
@@ -276,6 +347,7 @@ async def test_the_routes_act_on_the_conversation_the_page_names():
     link, sessions = _sessions()
     client = await _client(sessions, link)
 
+    sessions.get("uno"), sessions.get("due")  # both opened, as `/sessions/new` would
     client.post("/chat/send?s=uno", json={"text": "primo"})
     client.post("/chat/send?s=due", json={"text": "secondo"})
     import asyncio
@@ -301,6 +373,7 @@ async def test_the_live_pane_of_a_conversation_that_has_done_nothing_asks_for_no
     client = await _client(sessions, link)
 
     await sessions.get("vecchia").send("do something")
+    sessions.get("nuova")  # opened beside it, and told nothing
     calls_before = len(link.calls)
 
     assert client.get("/live/frame?s=nuova").status_code == 204
@@ -489,16 +562,28 @@ def test_the_spine_is_part_of_the_frame_and_is_the_only_way_in():
     import re
 
     spine = PAGE.index('id="railtab"')
-    assert spine < PAGE.index('<div id="left"'), (
+    assert spine < PAGE.index('id="left"'), (
         "the control sits inside or after the conversation pane, so it reads as "
         "one of that pane's buttons rather than as part of the frame")
     opens = re.findall(r'aria-controls="rail"', PAGE)
     assert len(opens) == 1, (
         "%d controls open the sessions column; two of them can disagree about "
         "whether it is open" % len(opens))
-    style = PAGE[PAGE.index("#railtab"):PAGE.index("@media (max-width:900px){ #railtab")]
+    style = PAGE[PAGE.index("#railtab{"):PAGE.index("/* Open: the spine lifts")]
     assert "writing-mode:vertical-rl" in style, (
         "the word runs across a column 34px wide, so it is not readable at all")
     assert "rotate(180deg)" in style, (
         "vertical-rl alone reads top to bottom; a spine in this alphabet reads "
         "bottom to top, which is what the drawing showed")
+
+    # ⛔ AND IT IS NEVER HIDDEN. The panel and its only opener used to be
+    # dropped by the same media query, and `#newchat` lives inside the panel: a
+    # window snapped to half a 1366-wide laptop lost every session control at
+    # once, and the only route left was hand-editing `?s=` in the address bar.
+    # The panel is an overlay, so folding it costs nothing at any width.
+    #
+    # Known-bad: hide `#railtab` or `#rail` at any breakpoint.
+    hidden = re.findall(r"#rail(?:tab)?\{[^}]*display:\s*none", PAGE)
+    assert not hidden, (
+        "%d rule(s) hide the sessions column or the only way into it: %s"
+        % (len(hidden), hidden))

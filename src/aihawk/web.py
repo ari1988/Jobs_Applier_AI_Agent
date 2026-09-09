@@ -81,22 +81,43 @@ PAGE = r"""<!doctype html>
   --line-3: rgba(255,255,255,.14);
   --lip:    inset 0 1px 0 rgba(255,255,255,.045);
 
-  /* Ink, with the contrast each one carries against --base. */
-  --fg:   #e8ebed;   /* 15.6:1  what the user typed, what the model answered */
-  --fg-2: #a8b1b9;   /*  8.6:1  narration and chrome labels */
-  --fg-3: #78828a;   /*  4.8:1  tool output and arguments, and now every quiet word */
+  /* ⛔ THE LADDER IS PICKED FROM THE USE SCENE, NOT FROM THE CATEGORY. This
+     interface is watched during long runs in a room with the lights off - the
+     screen is the only light - so the ground stays near black and nothing on it
+     is pure white: a full white on a dark ground at night is a lamp pointed at
+     the reader. The accent moves off coral onto amber for the same reason, that
+     being the warm end that disturbs dark-adapted eyes least, and every rung
+     gains headroom over the floor rather than sitting on it.
+
+     Ink, with the contrast each one carries against --base. */
+  --fg:   #dfe4e8;   /* 14.5:1  what the user typed, what the model answered */
+  --fg-2: #a6b0b8;   /*  8.4:1  narration and chrome labels */
+  --fg-3: #8d98a1;   /*  6.3:1  tool output and arguments, and every quiet word */
   /* ⛔ AND `--fg-4` NEVER COLOURS WORDS. It was carrying the count beside a
      conversation, the address under a link, the timing on a step, the marker of
      a list, the dim halves of the URL and the placeholder inside a preview -
      nine rules, all of them text, all of them at 2.4:1 where AA asks 4.5. The
      worst was the address: it is printed precisely so an injected link can be
      read, and it was the hardest thing on the page to read. */
-  --fg-4: #4a545c;   /*  2.4:1  decoration only - a dot, a chevron, never a word */
+  --fg-4: #6b747d;   /*  3.9:1  decoration only - a dot, a chevron, never a word.
+                                Three to one and not two: a chevron and an idle
+                                dot MEAN something, and a graphic that carries
+                                meaning has a floor of its own.
+                                ⛔ AND MEASURED WHERE IT IS PAINTED, not
+                                against the ground. All three of its uses sit on
+                                --raised: the idle dot in the browser bar, the
+                                chevron of a hovered row, the ring on a stopped
+                                browser's chip. At the old value that was 2.96:1
+                                - the same defect this ladder fixed for text,
+                                repeated one rung up. */
 
-  --accent:    #e38a5d;
-  --on-accent: #101317;
-  --ok:  #6cc08b;
-  --err: #e8836b;
+  --accent:    #e0a35f;   /* 8.5:1 */
+  --accent-hi: #ecb377;   /* the same amber a step up, for hover */
+  --stop:      #d94f45;   /* the one red that is a CONTROL and not a state */
+  --stop-hi:   #e0655a;
+  --on-accent: #151005;
+  --ok:  #79bf94;         /* 8.6:1 */
+  --err: #e88b76;         /* 7.4:1 */
 
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas,
@@ -110,12 +131,15 @@ PAGE = r"""<!doctype html>
      exactly this. Same pixels at the default 16px root, so nothing moves for
      anybody who never changed it. */
   --t-label:.6875rem; --t-mono:.8125rem; --t-ui:.8125rem; --t-body:.875rem;
-  --t-h1:1.0625rem; --t-h2:.9375rem; --t-h3:.8125rem;  /* the answer's headings */
+  /* Steps that read as steps: 17 and 15 sat a single pixel apart from the body
+     under them, so the hierarchy was carried by weight alone. */
+  --t-h1:1.125rem; --t-h2:1rem; --t-h3:.8125rem;       /* the answer's headings */
 
   --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:20px; --s6:32px;
   --r-sm:4px; --r:8px; --r-lg:12px; --r-pill:999px;
   --spine:54px;                               /* the sessions band */
   --topbar:50px;                              /* every header, one height */
+  --h-ctl:28px;                               /* every control on a bar */
   --gutter:1.75rem;                            /* three digits of 11px mono */
   --gap:.55rem;
   --indent:calc(var(--gutter) + var(--gap));   /* ONE source for the step indent */
@@ -142,6 +166,12 @@ code,pre,.g,.meta,.badge,#url,#tok{
 .label{ font-size:var(--t-label); font-weight:600; letter-spacing:.07em;
         text-transform:uppercase; color:var(--fg-3); line-height:1 }
 .sr{ position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%) }
+.skip{ position:absolute; left:var(--s2); top:var(--s2); z-index:20;
+       padding:8px 12px; background:var(--top); color:var(--fg);
+       border:1px solid var(--line-3); border-radius:var(--r);
+       font-size:var(--t-ui); text-decoration:none;
+       transform:translateY(-200%); transition:transform 120ms ease-out }
+.skip:focus{ transform:none }
 /* `hidden` must beat any display an id or class sets, or an element the script
    believes it has hidden stays on screen. This shipped once on the live image
    and again on the queued-message chip: both were "hidden" and both were
@@ -236,15 +266,24 @@ code,pre,.g,.meta,.badge,#url,#tok{
    drawn on the thing you press, where a hand already is. */
 #railtab[aria-expanded="true"]{ background:var(--raised); color:var(--fg) }
 #railtab[aria-expanded="true"] span{ display:none }
-@media (max-width:900px){ #railtab{ display:none } }
+/* ⛔ THE PANEL FOLDS, THE WAY IN DOES NOT. Both used to disappear at the
+   same breakpoint, and `#newchat` lives inside the panel - so a window snapped
+   to half a 1366-wide laptop lost every session control at once, with the only
+   route left being hand-editing `?s=` in the address bar. The panel is an
+   overlay: it costs nothing at any width. */
+@media (max-width:900px){ #rail{ width:min(84vw, 224px) } }
 #chats{ flex:1; min-height:0; overflow-y:auto; padding:var(--s2) var(--s2) var(--s3);
         /* A long list is cheap to skip past: the rows below the fold are not
            laid out until they are scrolled to, and Ctrl+F still finds them. */
         content-visibility:auto; contain-intrinsic-size:auto 600px }
 .chat{ position:relative; display:flex; align-items:center; gap:6px; width:100%;
        padding:7px 8px 7px 10px; border:0; border-radius:8px; background:none;
-       color:var(--fg-2); font:inherit; font-size:var(--t-small);
-       text-align:left; cursor:pointer }
+       /* --t-body and not --t-small: the latter was referenced here, exactly
+          once, and declared nowhere, so the size silently fell back to what
+          it inherited. A dangling token that renders plausibly is the kind
+          nobody reports. */
+       color:var(--fg-2); font:inherit; font-size:var(--t-body);
+       text-align:left }
 .chat:hover{ background:var(--raised); color:var(--fg) }
 /* A mark on the edge rather than a filled row: the current session should be
    findable at a glance without the list turning into a row of blocks. */
@@ -255,20 +294,33 @@ code,pre,.g,.meta,.badge,#url,#tok{
    user agent's button chrome has to come off or it draws as a raised box with
    its text centred - which is what shipped in the first screenshot of this
    column. A row in a list looks like a row. */
-.chat .nm{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;
+/* ⛔ THE POINTER GOES ON WHAT IS CLICKABLE. The row carried it and the row
+   has no handler: the padding around the name was a pointer cursor over
+   nothing, which is the honesty contract this file states for the browser bar
+   thirty lines earlier and did not keep here. */
+.chat .nm{ cursor:pointer; flex:1; min-width:0; overflow:hidden;
+           text-overflow:ellipsis;
            white-space:nowrap; border:0; background:none; color:inherit;
-           font:inherit; text-align:left; padding:0; cursor:pointer }
+           font:inherit; text-align:left; padding:0 }
+#chats .none{ margin:0; padding:var(--s3) var(--s2); color:var(--fg-3);
+              font-size:var(--t-label); line-height:1.5 }
 .chat .cnt{ flex:none; font-family:var(--mono); font-size:var(--t-label);
             color:var(--fg-3) }
 /* 24 and not 18: WCAG 2.2 puts the floor at 24px and this is the control
    that DELETES a conversation, so it is also the one where a near miss costs
    the most. */
+/* ⛔ HIDDEN FROM THE EYE, NOT FROM THE TAB ORDER. `visibility:hidden` takes
+   an element out of the focus order, and tabbing BACKWARD into a row then
+   skips it every time: the browser looks for the previous focusable while
+   that row is neither hovered nor focused, so the control that deletes a
+   conversation was reachable in one direction only. Transparent instead, and
+   it shows itself the moment it takes focus. */
 .chat .x{ flex:none; width:24px; height:24px; border:0; border-radius:4px;
           background:none; color:var(--fg-3); cursor:pointer; line-height:1;
-          visibility:hidden }
-.chat:hover .x, .chat:focus-within .x{ visibility:visible }
+          opacity:0; transition:opacity 120ms ease-out }
+.chat:hover .x, .chat:focus-within .x, .chat .x:focus-visible{ opacity:1 }
 .chat .x:hover{ background:var(--line-2); color:var(--fg) }
-@media (max-width:900px){ #rail{ display:none } }
+
 
 /* ⛔ A PERCENTAGE ALONE GIVES THE SURPLUS TO THE WRONG PANE. The conversation
    stops getting better past its measure cap - a wider column is a longer line,
@@ -291,16 +343,26 @@ code,pre,.g,.meta,.badge,#url,#tok{
    hand. */
 #split{ flex:0 0 9px; cursor:col-resize; position:relative; background:none;
         border:0; padding:0; touch-action:none }
+/* ⛔ NINE PIXELS OF LINE, TWENTY-FIVE OF TARGET. WCAG 2.2 puts the floor at
+   24px and none of its exceptions cover a separator: the arrow keys are a
+   path, not a control. The grab area reaches into the two panes it divides,
+   which is where a hand aims anyway, and nothing about the layout moves. */
+#split::before{ content:""; position:absolute; inset:0 -8px; cursor:col-resize }
 #split::after{ content:""; position:absolute; top:0; bottom:0; left:4px; width:1px;
                background:var(--line-1); transition:background-color 120ms ease-out }
 #split:hover::after{ background:var(--line-3) }
 #split:focus-visible{ outline:none }
 #split:focus-visible::after, #split[data-drag]::after{ background:var(--accent); width:2px }
 #right{ flex:1; min-width:0; display:flex; flex-direction:column; background:var(--well) }
+/* Three groups and not four things in a row: the name, then what this
+   conversation is costing and running, then the one thing you can do to it.
+   The rule that separates the last is the same hairline the panes use. */
 #head { flex:none; height:var(--topbar); display:flex; align-items:center;
-        gap:10px; padding:0 var(--s4);
+        gap:var(--s2); padding:0 var(--s4);
         border-bottom:1px solid var(--line-1) }
-#head b{ font-size:var(--t-ui); font-weight:600 }
+#head .vr{ width:1px; height:18px; flex:none; background:var(--line-2);
+           margin:0 var(--s1) }
+#head h1{ margin:0; font-size:var(--t-ui); font-weight:600 }
 .badge{ font-size:var(--t-label); color:var(--fg-2);
         background:var(--raised); border:1px solid var(--line-2);
         padding:3px 9px; border-radius:var(--r-pill) }
@@ -313,6 +375,16 @@ code,pre,.g,.meta,.badge,#url,#tok{
         transition:background-color 120ms ease-out, color 120ms ease-out }
 #fresh:hover:not(:disabled){ background:var(--hover); color:var(--fg) }
 #fresh:disabled{ opacity:.3; cursor:default }
+
+/* ⛔ `inert` HAS NO LOOK, AND A CONTROL THAT CANNOT BE USED MUST NOT LOOK
+   USABLE. This page already spells that `opacity:.3` on a disabled button, and
+   then said the same thing about whole SUBTREES with `inert` and drew them as
+   if nothing had happened. It was already wrong before the case that found it:
+   the Live/Frozen pair and the layout picker go inert whenever there is nothing
+   to see, and stayed fully lit the whole time. Seen on the running page, a
+   deleted conversation left a composer inviting a sentence it could not send.
+   One rule, so the look follows the mechanism rather than whoever remembers. */
+[inert]{ opacity:.3 }
 
 #log{ flex:1; overflow:auto; padding:var(--s5) var(--s4); scrollbar-gutter:stable }
 /* Capped in CHARACTERS and not in pixels, because the thing being limited is
@@ -361,7 +433,8 @@ code,pre,.g,.meta,.badge,#url,#tok{
            border-radius:var(--r); padding:var(--s3) var(--s4); text-align:left }
 #hint .sm{ font-size:.75rem; color:var(--fg-3) }
 
-#jump{ position:absolute; bottom:110px; left:50%; transform:translateX(-50%); z-index:2;
+#jump{ position:absolute; bottom:100%; margin-bottom:var(--s2);
+       left:50%; transform:translateX(-50%); z-index:2;
        background:var(--top); border:1px solid var(--line-2); color:var(--fg);
        font:var(--t-ui)/1 var(--sans); padding:7px 13px;
        border-radius:var(--r-pill); cursor:pointer }
@@ -448,20 +521,29 @@ h5.md-h, h6.md-h{ font-size:var(--t-h3); color:var(--fg-2) }
 .lk  { color:var(--fg) }
 .href{ color:var(--fg-3); font:.75rem/1.5 var(--mono); overflow-wrap:anywhere }
 .href::before{ content:" " }
+/* ⛔ NO COLOURED BAR DOWN THE LEFT EDGE. A 2px stripe on a callout is the
+   house style of every framework and belongs to none of them; a tint plus a
+   hairline in the same hue says the same thing without the costume. */
 .orph  { display:flex; gap:8px; font-size:var(--t-mono); color:var(--err);
-         background:rgba(232,131,107,.08); border-radius:var(--r-sm);
-         box-shadow:inset 2px 0 0 var(--err); padding:6px 10px }
+         background:color-mix(in srgb, var(--err) 9%, transparent);
+         border-radius:var(--r-sm);
+         border:1px solid color-mix(in srgb, var(--err) 32%, transparent);
+         padding:6px 10px }
 
 /* ONE grid: every row on the same rails, so nothing shifts as text changes. */
 .row{ display:grid; grid-template-columns:var(--gutter) minmax(0,1fr) auto 1rem;
       column-gap:var(--gap); align-items:baseline; padding:3px 6px;
-      list-style:none; cursor:pointer; user-select:none; border-radius:var(--r-sm);
+      list-style:none; cursor:pointer; border-radius:var(--r-sm);
       transition:background-color 120ms ease-out }
 .row::-webkit-details-marker{ display:none }
 .row:hover{ background:var(--raised) }
 .g   { grid-column:1; justify-self:end; font-size:var(--t-label); color:var(--fg-3) }
-.lab { grid-column:2; min-width:0; overflow:hidden; text-overflow:ellipsis;
-       white-space:nowrap; font-size:var(--t-mono) }
+/* Selectable: `user-select:none` on the whole row kept a double-click from
+   painting the line blue, and also made a truncated URL impossible to copy -
+   which is the one thing somebody wants from a row they cannot finish
+   reading. */
+.lab { user-select:text; grid-column:2; min-width:0; overflow:hidden;
+       text-overflow:ellipsis; white-space:nowrap; font-size:var(--t-mono) }
 .lab b   { font-family:var(--sans); font-weight:600; color:var(--fg) }  /* the verb */
 .lab code{ color:var(--accent) }                                        /* the object */
 .lab .inline{ color:var(--fg-3) }                    /* a short result, on the row */
@@ -494,8 +576,12 @@ h5.md-h, h6.md-h{ font-size:var(--t-h3); color:var(--fg-2) }
   animation:breathe 1.4s ease-in-out infinite }
 @media (prefers-reduced-motion: reduce){ .pend .g::after{ animation:none } }
 /* inset and not border-left: a border would shift all four tracks by two pixels */
-.ev[data-state="err"] > .row{ background:rgba(232,131,107,.07);
-                              box-shadow:inset 2px 0 0 var(--err) }
+/* ⛔ THE TOKEN, MIXED - NOT THE TOKEN'S CURRENT VALUE TYPED OUT AGAIN. Seven
+   places had `--err` and `--well` re-expanded as rgba by hand, which is seven
+   surfaces that would keep the old hue the day either token moves. */
+.ev[data-state="err"] > .row{
+     background:color-mix(in srgb, var(--err) 8%, transparent);
+     box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--err) 30%, transparent) }
 
 .out{ margin:2px 0 var(--s2) var(--indent);
       max-height:290px; max-height:15lh; overflow:auto; overscroll-behavior:contain;
@@ -505,7 +591,8 @@ h5.md-h, h6.md-h{ font-size:var(--t-h3); color:var(--fg-2) }
       border-radius:0 var(--r-sm) var(--r-sm) 0; padding:8px 10px }
 
 /* ---------------- composer ---------------- */
-form{ padding:var(--s3) var(--s4) var(--s4); border-top:1px solid var(--line-1);
+form{ position:relative; padding:var(--s3) var(--s4) var(--s4);
+      border-top:1px solid var(--line-1);
       background:var(--raised);
       box-shadow:0 -1px 0 rgba(0,0,0,.5), 0 -12px 28px -12px rgba(0,0,0,.65) }
 .composer{ display:flex; align-items:flex-end; gap:var(--s2);
@@ -521,17 +608,28 @@ form{ padding:var(--s3) var(--s4) var(--s4); border-top:1px solid var(--line-1);
    This was the first rule to be moved and it stayed the only one for a while;
    the other nine went the same way once somebody counted them. */
 #i::placeholder{ color:var(--fg-3) }
+/* ⛔ `currentColor` INHERITED THE PAGE'S INK ONTO THE ACCENT: the arrow
+   inside the only primary control on the page measured 1.71:1 against the
+   button it sits on, where a graphic that is a button's whole label wants
+   3:1. `--on-accent` was declared for exactly this and used nowhere; on the
+   accent it reads 8.6:1. */
 #go, #halt{ width:32px; height:32px; flex:none; border:0; border-radius:50%; display:grid;
      place-items:center; cursor:pointer; background:var(--accent);
+     color:var(--on-accent);
      box-shadow:inset 0 1px 0 rgba(255,255,255,.22);
      transition:background 120ms ease-out, transform 80ms ease-out }
+/* ⛔ THE PRIMARY CONTROL HAD NO HOVER AT ALL: the one button the whole
+   page exists for gave the pointer no answer until it was already pressed.
+   Everything else on the page hovers. */
+#go:hover:not(:disabled){ background:var(--accent-hi) }
+#halt:hover{ background:var(--stop-hi) }
 #go:active, #halt:active{ transform:scale(.92); box-shadow:none }
 #go:disabled{ opacity:.3; cursor:default }
 /* Its own button, not a mode of the send button. As a mode it disappeared the
    moment somebody typed, because the same control then meant "queue this for
    the next turn" - and the loop has no turn ceiling, so this button is the only
    thing that ends a run that will not converge. It follows the RUN. */
-#halt{ background:#d94f45 }
+#halt{ background:var(--stop) }
 #chip{ display:inline-flex; align-items:center; gap:6px; margin-bottom:var(--s2);
        background:var(--hover); border:1px solid var(--line-2); color:var(--fg-2);
        font-size:var(--t-label); padding:3px 9px; border-radius:var(--r-pill);
@@ -543,15 +641,22 @@ form{ padding:var(--s3) var(--s4) var(--s4); border-top:1px solid var(--line-1);
 /* The strip only exists when there is more than one tab: a single tab labelled
    with its own title is chrome that says nothing the address bar below it does
    not already say. */
-#tabs{ flex:none; display:flex; gap:2px; padding:6px 8px 0; background:var(--raised);
-       overflow-x:auto; scrollbar-width:none }
-#tabs button{ flex:0 1 190px; min-width:80px; display:flex; align-items:center; gap:6px;
-              border:0; border-radius:var(--r) var(--r) 0 0; cursor:pointer;
-              background:transparent; color:var(--fg-3); padding:6px 10px;
+/* ⛔ THE STRIP IS THE TOP OF THE BAR, NOT A THING FLOATING OVER IT. It sat
+   on the same surface as the bar with the SELECTED tab cut out in a darker
+   one, so the current page read as a hole punched in the header, and its left
+   edge started 4px before the address below it. Now the strip stands on the
+   page's ground and the selected tab is the bar's own surface, which is what
+   makes a tab look attached to what it opens - and both share one padding. */
+#tabs{ flex:none; display:flex; gap:2px; padding:6px var(--s3) 0;
+       background:var(--base); overflow-x:auto; scrollbar-width:none }
+#tabs button{ flex:0 1 190px; min-width:80px; height:28px; display:flex;
+              align-items:center; gap:6px; border:0; cursor:pointer;
+              border-radius:var(--r) var(--r) 0 0;
+              background:transparent; color:var(--fg-3); padding:0 10px;
               font:var(--t-label)/1.4 var(--sans); white-space:nowrap;
               overflow:hidden; text-overflow:ellipsis }
 #tabs button:hover{ background:var(--hover); color:var(--fg-2) }
-#tabs button[aria-selected="true"]{ background:var(--base); color:var(--fg) }
+#tabs button[aria-selected="true"]{ background:var(--raised); color:var(--fg) }
 #tabs .t{ overflow:hidden; text-overflow:ellipsis }
 
 /* The same height as the conversation's header beside it. They were 38 and
@@ -559,7 +664,8 @@ form{ padding:var(--s3) var(--s4) var(--s4); border-top:1px solid var(--line-1);
    seam - the one place a misalignment is read as the whole thing being
    loose rather than as one box being wrong. */
 #chrome{ flex:none; height:var(--topbar); display:flex; align-items:center;
-         gap:var(--s2); padding:0 10px; background:var(--raised); border-bottom:1px solid var(--line-1) }
+         gap:var(--s2); padding:0 var(--s3); background:var(--raised);
+         border-bottom:1px solid var(--line-1) }
 /* The honesty contract: nothing in here is interactive except what is, so
    nothing in here gets a pointer cursor except what does. */
 #chrome, #chrome *{ cursor:default; user-select:none }
@@ -570,123 +676,232 @@ form{ padding:var(--s3) var(--s4) var(--s4); border-top:1px solid var(--line-1);
 [data-state="busy"]  #dot{ background:var(--accent); animation:breathe .9s ease-in-out infinite }
 [data-state="frozen"]#dot{ background:var(--fg-2) }
 [data-state="offline"] #dot, [data-state="error"] #dot{ background:var(--err) }
-#url{ flex:1; min-width:0; height:24px; line-height:24px; padding:0 10px;
-      border-radius:var(--r-pill); background:var(--well); border:1px solid var(--line-1);
-      font-size:.75rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
-#url .dim{ color:var(--fg-3) }
+/* ⛔ ONE HEIGHT FOR EVERYTHING IN THIS BAR. The address was 24 tall, the
+   Live/Frozen pair 30 and the layout picker 30, so three controls on one line
+   sat on three different rhythms - the kind of thing nobody names and everybody
+   reads as unfinished. And the address is a FIELD, so it gets the field's
+   corner: a pill is for a badge, and using both shapes for everything is what
+   made this bar look assembled rather than designed. */
+#url{ flex:1; min-width:0; height:var(--h-ctl); line-height:calc(var(--h-ctl) - 2px);
+      padding:0 var(--s3); border-radius:var(--r); background:var(--well);
+      border:1px solid var(--line-1); font-size:.75rem;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+/* ⛔ BOTH FORMS, BECAUSE THE INTENT LIVED IN TWO PLACES AND MATCHED IN
+   NEITHER. The script sets `dim` on the address bar ITSELF when there is no
+   page, and the only rule was a descendant selector - so `no page yet`
+   rendered in the inherited ink and was the brightest thing on a bar that
+   was describing an empty room. The halves of a real URL are the descendant
+   case and keep working. */
+#url.dim, #url .dim{ color:var(--fg-3) }
 #url .host{ color:var(--fg) }
-#mode{ display:inline-flex; gap:2px; flex:none; background:var(--base);
-       border-radius:var(--r); padding:3px }
+#mode{ display:inline-flex; gap:2px; flex:none; height:var(--h-ctl);
+       align-items:center; background:var(--base); border:1px solid var(--line-1);
+       border-radius:var(--r); padding:0 2px }
 #mode button{ border:0; background:transparent; color:var(--fg-3);
               border-radius:var(--r-sm); padding:2px 9px;
-              font:500 var(--t-label)/1.5 var(--sans) }
-#mode button[aria-selected="true"]{ background:var(--top); color:var(--fg);
+              font:500 var(--t-label)/1.5 var(--sans);
+              transition:color 120ms ease-out }
+#mode button:hover:not([aria-pressed="true"]){ color:var(--fg-2) }
+#mode button[aria-pressed="true"]{ background:var(--top); color:var(--fg);
                                     box-shadow:0 1px 2px rgba(0,0,0,.35) }
+/* ⛔ A CONTROL THAT CANNOT DO ANYTHING DOES NOT LOOK READY. With no browser
+   open, Live/Frozen, the layout picker and the address are three armed controls
+   over an empty room: the bar looked identical whether the product was working
+   or waiting to be told what to do. */
+#right[data-empty="1"] #url,
+#right[data-empty="1"] #mode,
+#right[data-empty="1"] #grid{ opacity:.4 }
+/* ⛔ AND `pointer-events` IS NOT A DISABLED STATE. It only stops the
+   mouse: the five buttons kept their place in the tab order, kept the focus
+   ring, and Enter still fired the handler - so a keyboard could operate five
+   controls that look dead, and a screen reader announced them as ordinary
+   enabled buttons. `inert` takes them out of both. */
+#right[data-empty="1"] #mode,
+#right[data-empty="1"] #grid{ pointer-events:none }
+/* And the state word goes altogether: with nothing running it said IDLE, in
+   capitals, and was the brightest thing on a bar describing an empty room -
+   while the room itself already says what it is. */
+#right[data-empty="1"] #state{ position:absolute; width:1px; height:1px;
+                              overflow:hidden; clip-path:inset(50%) }
 
 /* The frame is solved from the available height, so a wide shot fills the width
    and a tall one fills the height. What is left over is stage, never a hole
    inside the frame. object-fit stays underneath for the one frame where the
    ratio is still the previous page's. */
 /* ---------------- the other browsers ----------------
-   A row of slow previews under the live pane, never a second live pane: eight
-   at full rate would want 2.3 seconds of pipe for every second that passes,
-   measured, and that is arithmetic rather than an optimisation problem. */
+   A row under the stage, never a second live pane: eight at full rate would
+   want more pipe than there is, and that is arithmetic rather than an
+   optimisation problem.
+
+   ⛔ AND A BROWSER WITH NO PICTURE DOES NOT GET A PICTURE FRAME. Six declared
+   but stopped browsers used to draw six 168x133 cards, each holding the words
+   `not up` in the middle of an empty grey rectangle: a wall of nothing, 133px
+   tall, in the place where the running ones live. A thing with no image is a
+   NAME, so it is drawn as one - a 26px chip - and the row goes from a gallery
+   of failures to a list of what this session has. */
 /* ⛔ NO CONTROLS HERE. Browsers are opened and closed by ASKING - "open
    another browser", "close the second one" - because the agent is what drives
    this and a button beside it is a second way to do the same thing, in a place
    where the two can disagree about which browser is current. The panes are
    views: clicking one changes what YOU are looking at and tells the agent
    nothing. */
-#thumbs{ flex:none; display:flex; gap:8px; padding:0 14px 12px; overflow-x:auto }
-/* The one the agent is driving, marked rather than selected: the person's eye
-   and the agent's hand are two different things and the pane says both. */
-.thumb .cap .dot{ flex:none; width:6px; height:6px; border-radius:50%;
-                  background:var(--ok, #6c9); box-shadow:0 0 0 2px var(--raised) }
-.thumb{ flex:none; width:168px; border:1px solid var(--line-2); border-radius:8px;
-        background:var(--raised); padding:0; cursor:pointer; overflow:hidden;
-        display:flex; flex-direction:column; text-align:left; font:inherit;
-        color:var(--fg-3) }
-.thumb:hover{ border-color:var(--line-3); color:var(--fg) }
-.thumb[aria-current="true"]{ border-color:var(--fg-2); color:var(--fg) }
+#thumbs{ flex:none; display:flex; align-items:flex-end; gap:var(--s2);
+         padding:0 var(--s3) var(--s3); overflow-x:auto }
+.thumb{ flex:none; width:150px; border:1px solid var(--line-2);
+        border-radius:var(--r); background:var(--raised); padding:0;
+        cursor:pointer; overflow:hidden; display:flex; flex-direction:column;
+        text-align:left; font:inherit; color:var(--fg-3);
+        transition:border-color 120ms ease-out }
+.thumb:hover{ border-color:var(--line-3); color:var(--fg-2) }
+.thumb[aria-current="true"]{ border-color:var(--fg-2); color:var(--fg-2) }
 .thumb .pic{ width:100%; aspect-ratio:16/10; background:var(--well);
              display:grid; place-items:center; overflow:hidden }
 .thumb .pic img{ width:100%; height:100%; object-fit:cover; display:block }
 .thumb .pic span{ font-size:var(--t-label); color:var(--fg-3); padding:4px;
                   text-align:center }
-.thumb .cap{ display:flex; align-items:center; gap:6px; padding:5px 7px;
+.thumb .cap{ display:flex; align-items:center; gap:6px; padding:5px 8px;
              font-family:var(--mono); font-size:var(--t-label) }
 .thumb .cap .id{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;
                  white-space:nowrap }
-.thumb .cap .st{ flex:none; color:var(--fg-3) }
+/* The one the agent is driving, marked rather than selected: the person's eye
+   and the agent's hand are two different things and the row says both. */
+.thumb .cap .dot, .chip .dot{ flex:none; width:6px; height:6px; border-radius:50%;
+                              background:var(--ok) }
+.chip{ flex:none; height:26px; display:flex; align-items:center; gap:7px;
+       padding:0 10px; border:1px solid var(--line-2); border-radius:var(--r-pill);
+       background:var(--raised); cursor:pointer; color:var(--fg-3);
+       font:var(--t-label)/1 var(--mono); letter-spacing:.02em;
+       transition:border-color 120ms ease-out, color 120ms ease-out }
+.chip:hover{ border-color:var(--line-3); color:var(--fg-2) }
+.chip[aria-current="true"]{ border-color:var(--fg-2); color:var(--fg-2) }
+.chip .off{ flex:none; width:6px; height:6px; border-radius:50%;
+            box-shadow:inset 0 0 0 1px var(--fg-4) }
 
-/* ⛔ THE STAGE IS A GRID NOW, AND HOW MANY CELLS IT HAS IS A MEASURED
-   DECISION. A frame costs 5 to 6 ms of pipe, not the 22 this file assumed
-   until it was measured again on 2026-09-09 with four real browsers: the
-   capture already runs inside the engine and the server hands over the latest
-   picture rather than taking one. Four panes at twenty frames a second each
-   deliver 80 a second in total, use about half the pipe, and an action still
-   lands in 49 ms against 40 with one pane. So four live screens are affordable
-   and eight are not, which is exactly the vocabulary a control room uses. */
-#stage{ flex:1; min-height:0; padding:14px; display:grid; gap:12px;
-        container-type:size }
+/* ---------------- the stage ----------------
+   ⛔ THE CARD IS THE PICTURE, NOT THE CELL, and getting that backwards is what
+   made this pane look unfinished. A cell used to be a full-height box with a
+   border and a shadow, and the picture floated in the middle of it: measured on
+   the bench, a 1280x688 window in a one-up cell drew 40% of the card as black,
+   and at two-up the two cards were the same size while their pictures were not,
+   so the smaller one read as broken rather than as a narrower window. Now the
+   frame SHRINK-WRAPS the picture - the border, the corner and the shadow belong
+   to the image - and the cell is only the space it is centred in.
+
+   How, without measuring anything: the picture sizes itself against the cell
+   with container units, and the browser's own chrome is cut with a NEGATIVE
+   MARGIN in percent. A percentage margin resolves against the containing
+   block's width, so `--cut` is the chrome expressed as a fraction of the
+   picture's WIDTH, and the frame's height ends up being the cropped height by
+   construction. No getBoundingClientRect, nothing to recompute on resize, and
+   the old two-number cache disappears with it. */
+#stage{ flex:1; min-height:0; padding:var(--s3); display:grid; gap:var(--s3) }
 #stage[data-grid="1"]{ grid-template-columns:1fr }
 #stage[data-grid="2"]{ grid-template-columns:1fr 1fr }
 /* Three on a 2x2 with one slot empty, because three equal screens and a gap
    is what a control room does: the alternative makes one of them special. */
 #stage[data-grid="3"],
 #stage[data-grid="4"]{ grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr }
-.screen{ min-width:0; min-height:0; display:flex; flex-direction:column;
-         background:var(--raised); border:1px solid var(--line-2);
-         border-radius:10px; overflow:hidden; box-shadow:0 18px 50px -22px #000;
-         padding:0; font:inherit; color:inherit; text-align:left; cursor:pointer;
-         transition:border-color 120ms ease-out }
-.screen:hover{ border-color:var(--line-3) }
-/* The one you are looking at, when there is more than one to look at. */
-/* A graphic that carries meaning wants 3:1, and this one carries the answer
-   to "which screen is the address bar describing" - which at 2.4:1 was a
-   question you had to ask twice. */
-.screen[aria-current="true"]{ border-color:var(--fg-2) }
-.screen .shot{ flex:1; min-height:0; position:relative; background:var(--well);
-               display:grid; place-items:center }
-/* contain and not cover: cropping a browser window hides part of what the
-   agent is looking at, which is the thing this pane exists to show. The bands
-   are the same recessed colour as the frame, so they read as the frame. */
-/* ⛔ ANCHORED, NOT SIZED IN PERCENT. `height:100%` on a grid item whose parent
-   takes its height from a flex row does not resolve, so the picture fell back
-   on its own aspect ratio and came out 23px taller than the box it was in -
-   measured - which put it over the caption underneath. Absolute against the
-   shot gives it a definite box on both axes and `contain` does the rest. */
-.screen .shot img{ position:absolute; inset:0; width:100%; height:100%;
-                   object-fit:contain; object-position:top center; display:block }
-/* Visibility rides the `hidden` property. An earlier version set
-   `style.display = ''` to show the image, which removes the inline value and
-   falls back on a stylesheet rule hiding it: the pane stayed black with the
-   pixels already decoded inside it, and every structural assertion passed. */
-.screen .shot img[hidden]{ display:none }
+
+.screen{ container-type:size; min-width:0; min-height:0;
+         display:grid; place-items:center; overflow:hidden;
+         background:none; border:0; padding:0; margin:0;
+         font:inherit; color:inherit; text-align:left; cursor:pointer }
+.frame{ position:relative; overflow:hidden; border:1px solid var(--line-2);
+        border-radius:var(--r-lg); background:var(--well);
+        box-shadow:0 12px 30px -20px #000;
+        transition:border-color 120ms ease-out }
+.screen:hover .frame{ border-color:var(--line-3) }
+/* The one you are looking at, when there is more than one to look at. A border
+   that carries meaning wants 3:1, and --fg-2 is 8.6. */
+.screen[aria-current="true"] .frame{ border-color:var(--fg-2) }
+/* ⛔ AND THE FRAME IS THE LARGEST BOX OF THE PICTURE'S SHAPE THAT THE CELL
+   CAN HOLD, which is one line of CSS and the whole reason the cells stopped
+   being loose. The first attempt let the image size itself and the frame
+   shrink-wrap it: correct for a picture bigger than the cell, and wrong for
+   every other case, because an image is never scaled UP to fill a box - so a
+   small capture sat at its natural size in the middle of a large pane and the
+   cell looked empty again, which is the defect this was meant to end.
+   `--arn` is the picture's shape AFTER the crop and `--cut` the crop itself,
+   both set once per shape by the frame that arrives. */
+.frame{ aspect-ratio:var(--arn, 1.6);
+        width:min(100cqw, calc(100cqh * var(--arn, 1.6))) }
+.frame img{ position:absolute; left:0; top:0; width:100%; height:auto;
+            margin-top:calc(var(--cut, 0%) * -1) }
+.frame img[hidden]{ display:none }
+
+/* ⛔ WAITING, EMPTY, STOPPED AND FAILED ARE FOUR STATES AND THEY USED TO DRAW
+   ONE BLACK RECTANGLE. On the bench, a browser whose capture answered 503 and
+   one that simply had not sent its first frame were pixel-identical, and both
+   read as a product that is broken. Whatever the pane cannot show, it says. */
+.veil{ position:absolute; inset:0; display:grid; place-content:center;
+       justify-items:center; gap:6px; padding:0 var(--s4); text-align:center;
+       background:var(--well) }
+.veil b{ font:600 var(--t-ui)/1.4 var(--sans); color:var(--fg-2) }
+.veil span{ font-size:var(--t-label); color:var(--fg-3); max-width:34ch }
+.veil[hidden]{ display:none }
+/* Over a picture that is still there, the veil is a scrim and not a wall: the
+   last frame is evidence, and hiding it to announce that it is old throws away
+   the only thing the pane has. */
+/* Deep enough that the words on it hold their contrast over a white page,
+   shallow enough that the last frame stays evidence underneath. */
+.screen[data-state="stale"] .veil{
+     background:linear-gradient(color-mix(in srgb, var(--well) 86%, transparent),
+                                color-mix(in srgb, var(--well) 93%, transparent)) }
+.screen[data-state="error"] .veil b{ color:var(--err) }
+/* The pulse says the pane is trying, which is the difference between waiting
+   and stopped - and it is the whole reason a spinner exists. */
+.veil .pulse{ width:56px; height:2px; border-radius:2px; background:var(--line-3);
+              overflow:hidden; position:relative }
+.veil .pulse::after{ content:""; position:absolute; inset:0 auto 0 0; width:40%;
+                     background:var(--fg-3); border-radius:2px;
+                     animation:slide 1.4s ease-in-out infinite }
+@keyframes slide{ 0%{ left:0 } 50%{ left:60% } 100%{ left:0 } }
+
+/* The name rides ON the picture. It used to be a 28px bar bolted under the
+   card, which put the label of a thing outside the thing and cost a row of
+   height in every cell of a 2x2. */
+/* ⛔ THE PLATE CARRIES ITS OWN GROUND. These two sit on a live capture of
+   somebody else's website, so a translucent backdrop makes their contrast a
+   function of that page's stylesheet: measured over a white page the id read
+   3.9:1 and the staleness 3.4:1, both under the floor, and most of the web is
+   white. Opaque, with a hairline so it still reads as sitting on top. */
+.tag, .stamp{ position:absolute; top:8px; height:20px; display:flex;
+              align-items:center; gap:6px; padding:0 8px; pointer-events:none;
+              border-radius:var(--r-sm); background:var(--well);
+              box-shadow:0 0 0 1px rgba(255,255,255,.14);
+              font:var(--t-label)/1 var(--mono); letter-spacing:.02em }
+.tag{ left:8px; color:var(--fg-2); max-width:calc(100% - 96px);
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.tag .dot{ flex:none; width:6px; height:6px; border-radius:50%;
+           background:var(--ok) }
+/* ⛔ STALE HAS TO LOOK STALE. In a grid most of what you see is a picture from
+   a moment ago by construction, and a control room's first rule is that a feed
+   which has stopped must not read as one that is running. Nothing while the
+   frames keep coming, a number in seconds the moment they do not. */
+.stamp{ right:8px; color:var(--err) }
+.stamp[hidden]{ display:none }
+
+/* The empty stage is not a void with a sentence in it: it is the one place
+   that has to say how a browser gets opened, because there is no button that
+   does it - they are opened by asking, on purpose. */
+.empty{ grid-column:1 / -1; grid-row:1 / -1; display:grid; place-content:center;
+        justify-items:center; gap:var(--s2); text-align:center; padding:var(--s4) }
+.empty b{ font:600 var(--t-h2)/1.3 var(--sans); color:var(--fg-2) }
+.empty span{ font-size:var(--t-ui); color:var(--fg-3); max-width:38ch }
+.empty code{ font:var(--t-mono)/1.9 var(--mono); color:var(--fg-2);
+             background:var(--raised); border:1px solid var(--line-1);
+             border-radius:var(--r); padding:6px var(--s3); margin-top:var(--s1) }
+
 /* The second half of the address bar when nobody has picked a screen: the count
    is the fact, this is what to do about it. */
 #url .hint{ color:var(--fg-3); font-family:var(--sans); font-size:var(--t-label) }
 #url .hint::before{ content:"  -  "; white-space:pre }
-.screen .ph{ color:var(--fg-3); font-size:var(--t-ui); text-align:center;
-             padding:0 16px }
-.screen .cap{ flex:none; display:flex; align-items:center; gap:7px;
-              padding:5px 9px; border-top:1px solid var(--line-1);
-              font-family:var(--mono); font-size:var(--t-label);
-              color:var(--fg-3) }
-.screen .cap .id{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;
-                  white-space:nowrap }
-/* ⛔ STALE HAS TO LOOK STALE. In a grid most of what you see is a picture from
-   a moment ago by construction, and a control room's first rule is that a feed
-   which has stopped must not read as one that is running. Empty while the
-   frames keep coming, and a number in seconds the moment they do not. */
-.screen .cap .age{ flex:none; color:var(--err) }
-.screen .cap .dot{ flex:none; width:6px; height:6px; border-radius:50%;
-                   background:var(--ok, #6c9); box-shadow:0 0 0 2px var(--raised) }
 
-#grid{ flex:none; display:flex; gap:2px; background:var(--well);
-       border:1px solid var(--line-2); border-radius:var(--r-pill); padding:2px }
+#grid{ flex:none; display:flex; align-items:center; gap:2px; height:var(--h-ctl);
+       background:var(--well); border:1px solid var(--line-2);
+       border-radius:var(--r); padding:0 2px }
 #grid button{ min-width:30px; height:24px; padding:0 5px; border:0;
-              border-radius:var(--r-pill); background:none; cursor:pointer;
+              border-radius:var(--r-sm); background:none; cursor:pointer;
               display:grid; place-items:center; color:var(--fg-3);
               transition:background-color 120ms ease-out, color 120ms ease-out }
 #grid button:hover{ color:var(--fg-2) }
@@ -695,9 +910,12 @@ form{ padding:var(--s3) var(--s4) var(--s4); border-top:1px solid var(--line-1);
 /* The small things whose absence is felt without being noticed. */
 :focus{ outline:none }
 :focus-visible{ outline:2px solid var(--accent); outline-offset:2px; border-radius:inherit }
-::selection{ background:rgba(227,138,93,.30); color:#fff }
+/* The accent itself, mixed - it was a second orange one shade off the one
+   this page uses, and white ink in a palette whose own rule forbids it. */
+::selection{ background:color-mix(in srgb, var(--accent) 30%, transparent);
+             color:var(--fg) }
 :root{ accent-color:var(--accent) }
-*{ scrollbar-width:thin; scrollbar-color:#2f363e transparent }
+*{ scrollbar-width:thin; scrollbar-color:var(--top) transparent }
 
 @keyframes rise{ from{ opacity:0; transform:translateY(3px) } }
 @keyframes breathe{ 0%,100%{opacity:1} 50%{opacity:.35} }
@@ -716,6 +934,11 @@ form{ padding:var(--s3) var(--s4) var(--s4); border-top:1px solid var(--line-1);
      Drawn on a napkin on 2026-09-09 after a bar in the header turned out not to
      be it - a control that is part of the frame reads as permanent, where one
      among the header's other controls reads as one more button. -->
+<!-- ⛔ THE COMPOSER IS THE 112th TAB STOP. Every step of every run is a
+     <summary>, so the only input on the page - the reason the page exists -
+     sits behind the entire transcript, and the queue grows with the run. One
+     link, first in the document, off-screen until it is focused. -->
+<a class="skip" href="#i">Skip to the message box</a>
 <button id="railtab" type="button" aria-expanded="false" aria-controls="rail"
         title="Sessions"><span>Sessions</span></button>
 
@@ -734,19 +957,30 @@ form{ padding:var(--s3) var(--s4) var(--s4); border-top:1px solid var(--line-1);
   <div id="chats" role="list"></div>
 </nav>
 
-<div id="left">
+<!-- Two landmarks, so somebody moving by region can go straight to the
+     conversation or to the browsers instead of walking the whole page. -->
+<main id="left" aria-label="Conversation">
   <!-- The meter lives up here with the other things that describe the
        conversation rather than under the box you type in. What is under the box
        should be the box: a number that grows all session long, sitting between
        the composer and the edge of the window, is the one place a person looks
        twenty times an hour for something else. -->
   <div id="head">
-    <b>AIHawk</b>
+    <!-- ⛔ A HEADING AND NOT A BOLD WORD. The page had no h1 at all, so the
+         answers' own headings - which start at h3 on the reasoning that the
+         product's name sits above them - hung under nothing. -->
+    <h1>AIHawk</h1>
     <span id="tok" hidden></span>
     <span class="badge" id="model">no model</span>
+    <span class="vr" aria-hidden="true"></span>
     <button id="fresh" type="button" title="Clear this conversation">Clear</button></div>
   <div id="log">
-    <div id="thread">
+    <!-- ⛔ role=log, OR THE WHOLE PRODUCT IS SILENT. Everything the agent
+         does arrives here by appending a node, and the only live region on the
+         page carried the word `idle`. Somebody who cannot see the screen was
+         told nothing, ever - and the other channel, the picture, ships with an
+         empty alt on purpose. -->
+    <div id="thread" role="log" aria-live="polite" aria-relevant="additions">
       <div id="hint">
         <p>Tell it what to do, in a sentence. It opens the pages, reads them and
            clicks, and you watch on the right.</p>
@@ -757,24 +991,33 @@ form{ padding:var(--s3) var(--s4) var(--s4); border-top:1px solid var(--line-1);
     </div>
     <div id="anchor"></div>
   </div>
-  <button id="jump" hidden type="button">jump to latest</button>
   <form id="f" autocomplete="off">
-    <button id="chip" type="button" hidden>1 message queued <span aria-hidden="true">&#9998;</span></button>
+    <!-- Inside the composer and anchored to its top edge: it used to sit at a
+         hard 110px from the bottom, which is a guess at the height of a box
+         that GROWS with what is typed into it and again with the reader's font
+         size, so at 200% with a queued message it landed on top of the thing
+         it floats above. -->
+    <button id="jump" hidden type="button">jump to latest</button>
+    <button id="chip" type="button" hidden>1 message queued
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"
+           stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+           stroke-linejoin="round"><path d="M10.6 2.9l2.5 2.5L5.6 12.9 2.5 13.5l.6-3.1z"/></svg></button>
     <div class="composer">
       <label class="sr" for="i">What should the agent do?</label>
       <textarea id="i" rows="1" placeholder="What should the agent do?"></textarea>
       <button id="go" type="submit" aria-label="Send" disabled>
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
-             stroke="#101317" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+             stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+             stroke-linejoin="round">
           <path d="M7 12V2M2.5 6.5L7 2l4.5 4.5"/></svg>
       </button>
       <button id="halt" type="button" hidden aria-label="Stop">
         <svg width="12" height="12" viewBox="0 0 12 12">
-          <rect width="12" height="12" rx="2" fill="#fff"/></svg>
+          <rect width="12" height="12" rx="2" fill="currentColor"/></svg>
       </button>
     </div>
   </form>
-</div>
+</main>
 
 <!-- The split is a control, so it says so: a real separator with a value a
      screen reader can read and the arrow keys can move. Which pane deserves
@@ -785,14 +1028,21 @@ form{ padding:var(--s3) var(--s4) var(--s4); border-top:1px solid var(--line-1);
      aria-label="Width of the conversation" aria-valuemin="420"
      aria-valuenow="530"></div>
 
-<div id="right" data-state="idle">
+<section id="right" data-state="idle" aria-label="The browsers this session holds">
   <div id="tabs" hidden></div>
   <div id="chrome">
     <span id="dot"></span>
     <span id="url" class="dim">no page yet</span>
-    <span id="mode" role="tablist">
-      <button role="tab" aria-selected="true" data-v="live" type="button">Live</button>
-      <button role="tab" aria-selected="false" data-v="hold" type="button">Frozen</button>
+    <!-- ⛔ A GROUP OF TOGGLES, NOT TABS. `role="tablist"` promises panels this
+         page does not have and a keyboard pattern it does not implement: arrow
+         keys did nothing, `aria-controls` pointed at nothing, and a screen
+         reader announced "tab, 1 of 2" for a switch. Its neighbour, the layout
+         picker, already had this right. -->
+    <span id="mode" role="group" aria-label="Whether the picture keeps updating">
+      <button aria-pressed="true" data-v="live" type="button"
+              title="Keep the picture updating">Live</button>
+      <button aria-pressed="false" data-v="hold" type="button"
+              title="Stop updating the picture. The agent keeps working.">Frozen</button>
     </span>
     <span id="state" class="label" aria-live="polite">idle</span>
     <!-- How many browsers are on the stage at once. The vocabulary of a
@@ -806,25 +1056,26 @@ form{ padding:var(--s3) var(--s4) var(--s4); border-top:1px solid var(--line-1);
       <button type="button" data-n="1" aria-pressed="true"
               aria-label="One screen" title="One screen">
         <svg viewBox="0 0 18 12" width="18" height="12" fill="none"
-             stroke="currentColor" stroke-width="1.3">
+             stroke="currentColor" stroke-width="1.6">
           <rect x="1" y="1" width="16" height="10" rx="1.6"/></svg></button>
       <button type="button" data-n="2" aria-pressed="false"
               aria-label="Two screens" title="Two screens">
         <svg viewBox="0 0 18 12" width="18" height="12" fill="none"
-             stroke="currentColor" stroke-width="1.3">
+             stroke="currentColor" stroke-width="1.6">
           <rect x="1" y="1" width="16" height="10" rx="1.6"/>
           <path d="M9 1v10"/></svg></button>
       <button type="button" data-n="4" aria-pressed="false"
               aria-label="Four screens" title="Four screens">
         <svg viewBox="0 0 18 12" width="18" height="12" fill="none"
-             stroke="currentColor" stroke-width="1.3">
+             stroke="currentColor" stroke-width="1.6">
           <rect x="1" y="1" width="16" height="10" rx="1.6"/>
           <path d="M9 1v10M1 6h16"/></svg></button>
     </span>
   </div>
   <div id="stage" data-grid="1"></div>
-  <div id="thumbs" aria-label="The other browsers in this session"></div>
-</div>
+  <!-- role, or the label is ignored: a bare div takes no accessible name. -->
+  <div id="thumbs" role="group" aria-label="The other browsers in this session"></div>
+</section>
 
 <script>
 const $ = id => document.getElementById(id);
@@ -877,7 +1128,16 @@ const RULE   = /^\s*([-*_])\s*(?:\1\s*){2,}$/;
 const CELLS  = /\|/;
 const DASHES = /^[\s:|-]*-[\s:|-]*$/;
 
-function blocks(text, into){
+/* ⛔ A FLOOR ON THE RECURSION, because this text was written by a model
+   that had just read arbitrary web pages. Measured against the extracted
+   parser: 20,000 `>` on one line, or a list indented 10,000 levels, throws
+   RangeError - and the throw does not land in the parser, it lands in the
+   event handler, where it strands the step clock, skips the redraw and eats
+   the queued instruction. Past this depth the marks are drawn as the text
+   they are, which is what nesting that deep actually is. */
+const DEEP = 24;
+function blocks(text, into, depth){
+  depth = depth || 0;
   const lines = text.split('\n');
   let i = 0;
   while(i < lines.length){
@@ -891,16 +1151,18 @@ function blocks(text, into){
       inline(head[2], h); into.appendChild(h); i++; continue;
     }
     if(RULE.test(line)){ into.appendChild(el('hr','md-hr')); i++; continue; }
-    if(QUOTE.test(line)){
+    if(QUOTE.test(line) && depth < DEEP){
       const held = [];
       while(i < lines.length && QUOTE.test(lines[i])) held.push(QUOTE.exec(lines[i++])[1]);
       const q = el('blockquote','md-q');
-      blocks(held.join('\n'), q);          /* a quote holds blocks like any other */
+      blocks(held.join('\n'), q, depth + 1); /* a quote holds blocks like any other */
       into.appendChild(q); continue;
     }
     if(CELLS.test(line) && i + 1 < lines.length && DASHES.test(lines[i + 1])
        && lines[i + 1].includes('-')){ i = tableAt(lines, i, into); continue; }
-    if(BULLET.test(line) || NUMBER.test(line)){ i = listAt(lines, i, into); continue; }
+    if((BULLET.test(line) || NUMBER.test(line)) && depth < DEEP){
+      i = listAt(lines, i, into, depth); continue;
+    }
     /* ⛔ THE FIRST LINE IS TAKEN WITHOUT ASKING, and that is what makes this
        loop finish. Every branch above consumes; this one is the floor, so if
        its condition ever excluded the line that got here the walker would sit
@@ -919,7 +1181,7 @@ function blocks(text, into){
 /* Both of these return the line to carry on from, so the walker above never has
    to guess how much they ate - a block parser that advances by one and hopes is
    how a list ends up inside itself. */
-function listAt(lines, i, into){
+function listAt(lines, i, into, depth){
   const first = BULLET.exec(lines[i]) || NUMBER.exec(lines[i]);
   const base = first[1].length;
   const ordered = !BULLET.test(lines[i]);
@@ -933,7 +1195,9 @@ function listAt(lines, i, into){
       item.appendChild(document.createTextNode('\n' + lines[i].trim()));
       i++; continue;
     }
-    if(mark[1].length > base){ i = listAt(lines, i, item || box); continue; }
+    if(mark[1].length > base && (depth || 0) < DEEP){
+      i = listAt(lines, i, item || box, (depth || 0) + 1); continue;
+    }
     if(mark[1].length < base || !BULLET.test(lines[i]) !== ordered) break;
     item = el('li','md-i');
     inline(mark[2], item);
@@ -967,7 +1231,7 @@ function rich(text){
      is prose that changes shape when the closing fence arrives. */
   text.split('```').forEach((block, i) => {
     if(i % 2) frag.appendChild(el('pre','out', block.replace(/^[a-z]*\n/i, '')));
-    else if(block.trim()) blocks(block, frag);
+    else if(block.trim()) blocks(block, frag, 0);
   });
   return frag;
 }
@@ -994,7 +1258,14 @@ const VERB = {
   session_status:['Checking session','Checked session']
 };
 const LEAD = /^(I will |I'll |I am |I'm |Let me |Now I will |Now I'll )/i;
-const LONG = 120;
+/* ⛔ MEASURED IN CHARACTERS, SPENT IN PIXELS - the same defect this project
+   recorded when `ch` was mistaken for a character, one surface later. The
+   label track is 416px wide at the default split, the mono face is 7.15px a
+   character at 13px and the verb in front eats about 67, so the row shows
+   about FORTY-EIGHT. The branch accepted a hundred and twenty. Counted on a
+   live transcript: 43 rows of 108 were cut off AND had their disclosure
+   removed, so the one thing that could have shown the rest was gone. */
+const LONG = 48;
 
 const thread = $('thread'), anchor = $('anchor'), log = $('log');
 let turn = null, live = null, hold = null, n = 0, t0 = 0, timer = 0;
@@ -1054,7 +1325,18 @@ function flush(asAnswer, replay){
   const text = hold.replace(LEAD,'').replace(/^\w/, c => c.toUpperCase());
   hold = null;
   const box = el('div', asAnswer ? 'answer' : 'say');
-  box.appendChild(rich(text));
+  /* ⛔ A DEFECT INSIDE ONE ANSWER MUST NOT TAKE THE TURN WITH IT. This runs
+     from the event handler, and the caller goes on to clear the step clock,
+     redraw the column and send whatever was queued - so a throw here stranded
+     a 10 Hz timer for the life of the page and silently swallowed an
+     instruction somebody had typed. The text is shown as text rather than
+     lost: the same shape as the scheduler, which keeps doing its own job when
+     a pass inside it fails. */
+  try {
+    box.appendChild(rich(text));
+  } catch(err){
+    box.appendChild(el('pre','out', text));
+  }
   put(box, replay);
 }
 
@@ -1097,7 +1379,12 @@ function land(kind, text, replay){
     d.dataset.body = 'none';
     s.querySelector('.lab').append(' ', el('span','inline', text));
   } else {
+    /* Anything that does not fit keeps a body, so the chevron is present for
+       exactly the rows that need it. */
     d.appendChild(el('pre','out', text));
+    /* And the row says it on hover too: nobody should have to open a
+       disclosure to find out whether it is worth opening. */
+    s.querySelector('.lab').title = text.slice(0, 400);
   }
 }
 
@@ -1162,6 +1449,15 @@ function listen(){
   if(es) es.close();
   es = new EventSource(at('/chat/events'));
   es.onmessage = onEvent;
+  /* ⛔ A STREAM THAT DIED LOOKS EXACTLY LIKE AN AGENT WITH NOTHING TO SAY.
+     EventSource reconnects on its own, so this is not a retry - it is the
+     only signal that the silence is the connection and not the work. The dot
+     and the word beside it describe the BROWSER, and said `live` throughout. */
+  es.onerror = () => {
+    if(es.readyState === EventSource.CONNECTING) say('offline', 'reconnecting');
+    if(es.readyState === EventSource.CLOSED) say('offline', 'the stream closed');
+  };
+  es.onopen = () => { if(right.dataset.state === 'offline') say(frozen ? 'frozen' : 'live'); };
 }
 const onEvent = (e) => {
   const m = JSON.parse(e.data), r = m.replay;
@@ -1228,9 +1524,14 @@ function paint(){
   chip.hidden = !queued;
 }
 i.addEventListener('input', () => {
+  /* ⛔ ONE FORCED LAYOUT PER KEYSTROKE, NOT TWO. Reading scrollHeight after
+     writing height forces the layout; reading it a SECOND time after the
+     second write forces another, over a document holding the whole
+     transcript. The one number is enough to decide both. */
   i.style.height = 'auto';
-  i.style.height = Math.min(i.scrollHeight, 200) + 'px';
-  i.style.overflowY = i.scrollHeight >= 200 ? 'auto' : 'hidden';
+  const wants = i.scrollHeight;
+  i.style.height = Math.min(wants, 200) + 'px';
+  i.style.overflowY = wants >= 200 ? 'auto' : 'hidden';
   paint();
 });
 i.addEventListener('keydown', e => {
@@ -1243,16 +1544,38 @@ i.addEventListener('keydown', e => {
 document.addEventListener('keydown', e => {
   if(e.key !== 'Escape' || !busyNow) return;
   if(document.activeElement === i && i.value.trim()) return;
-  fetch(at('/chat/stop'), {method:'POST'});
+  /* Through the same door as the button: a hoisted declaration, so calling it
+     from above where it is written is safe and nothing here depends on the
+     order of the lines. */
+  ask('/chat/stop', undefined,
+      'The stop did not reach the agent - it is still running');
 });
 /* A pencil and not a cross: a cross would read as "cancel the queued message".
    This returns it to the composer to be edited. */
 chip.onclick = () => { i.value = queued; setQueued(null); i.focus();
                        i.dispatchEvent(new Event('input')); };
 
-function send(text){
-  fetch(at('/chat/send'), {method:'POST', headers:{'Content-Type':'application/json'},
-                       body: JSON.stringify({text})});
+/* ⛔ THE BOX IS NOT EMPTIED UNTIL THE SERVER HAS THE SENTENCE. This page
+   already argues, about the QUEUED path, that losing typed text with nothing
+   said is the one thing it must not do - and then the primary path cleared
+   the box first and fired a fetch nobody read. Server restarting, port
+   changed, laptop asleep: the instruction was gone and the transcript never
+   grew, which reads as the agent ignoring you. */
+async function send(text){
+  try {
+    const r = await door('/chat/send', {method:'POST',
+                         headers:{'Content-Type':'application/json'},
+                         body: JSON.stringify({text})});
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+  } catch(err){
+    /* Give it back, exactly as it was, and say why - the sentence is the
+       person's work and this is the only copy of it. */
+    i.value = text;
+    i.dispatchEvent(new Event('input'));
+    if(vanished) return;
+    orphan('err', 'That instruction did not reach the server (' + err.message
+           + '). It is back in the box - try again.');
+  }
 }
 /* Clearing the page is NOT what this does, and the difference is the point:
    it asks the server to forget the transcript, because the transcript is what
@@ -1271,9 +1594,78 @@ function wipe(){
   busyNow = false;
   setQueued(null);
 }
-fresh.onclick = () => fetch(at('/chat/fresh'), {method:'POST'});
+let vanished = false;
+/* ⛔ ONE PLACE ASKS THIS CONVERSATION FOR ANYTHING, so one place can notice
+   that it is not there any more. Six fetches carry `?s=`, and each of them
+   would otherwise need the same three lines - written six times, the seventh
+   is where a page goes on talking to a session somebody deleted. Which is not
+   hypothetical: every one of those questions used to DECLARE the session again
+   on the server, so a delete that had already closed the browsers and erased
+   the transcript came straight back as an empty row, for as long as one tab
+   stayed open on it. */
+async function door(path, init){
+  const r = await fetch(at(path), init);
+  /* 410 and nothing else. Every other failure is worth trying again; this one
+     is the only one that will never stop being true. */
+  if(r.status === 410){ vanish(); throw new Error('this conversation was deleted'); }
+  return r;
+}
 
-halt.onclick = () => fetch(at('/chat/stop'), {method:'POST'});
+/* Deleted from the other tab, or from another window. The page says so and
+   stops asking, in that order. It does NOT navigate anywhere: the column
+   beside it still works, and where to go next is not this page's decision to
+   make for somebody who is in the middle of reading. */
+function vanish(){
+  if(vanished) return;
+  vanished = true;
+  if(es) es.close();
+  say('offline', 'deleted');
+  orphan('err', 'This conversation was deleted. Nothing here is live any more '
+         + '- open another one from Sessions, or start a new one.');
+  /* Everything goes inert EXCEPT the way out. `inert` rather than `disabled`
+     because these are subtrees and not single controls, and it takes them out
+     of the pointer AND the tab order - a composer that answers the keyboard
+     while it cannot send is the same lie in a different place. The column of
+     sessions keeps its full contrast, because the sentence above tells the
+     person to use it. */
+  for(const box of [f, $('right'), $('fresh')]) box.inert = true;
+  drawChats();
+}
+
+/* ⛔ ONE PLACE KNOWS WHAT TO DO WHEN A REQUEST DOES NOT ARRIVE. Six
+   `fetch` calls had no failure path at all, and the sharpest of them is the
+   stop button: this file says elsewhere that it is the only thing that ends a
+   run which will not converge, and a press that never reached the server
+   looked exactly like a press that did. `ask` returns the response when it
+   worked and says so on the page when it did not. */
+async function ask(path, body, whatFailed){
+  try {
+    const r = await door(path, body === undefined
+      ? {method:'POST'}
+      : {method:'POST', headers:{'Content-Type':'application/json'},
+         body: JSON.stringify(body)});
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    return r;
+  } catch(err){
+    /* The one failure that already said its piece, and says it once. */
+    if(!vanished) orphan('err', whatFailed + ' (' + err.message + ').');
+    return null;
+  }
+}
+
+/* ⛔ THE ONLY UNGUARDED DESTRUCTIVE CONTROL, AND IT SAT IN THE PERMANENT
+   HEADER. Deleting a whole session - rarer, and behind a closed panel - asked
+   first and named what went with it; clearing the transcript, which also
+   makes the model forget everything it has been told, went on one click. The
+   guard was on the wrong control. Named on the message, and named again on
+   the button. */
+fresh.onclick = () => {
+  if(!confirm('Clear this conversation? The agent forgets everything you have told it. Its browsers stay open.')) return;
+  ask('/chat/fresh', undefined, 'Could not clear this conversation');
+};
+
+halt.onclick = () => ask('/chat/stop', undefined,
+                         'The stop did not reach the agent - it is still running');
 f.onsubmit = (e) => {
   e.preventDefault();
   const t = i.value.trim();
@@ -1305,15 +1697,20 @@ let frozen = false;
    one of them in the place the eye goes for news. `idle`, `busy` and `error`
    are news, and they are now the only things that appear there; the dot keeps
    carrying live and frozen, which is what a dot is for. */
+/* ⛔ HIDDEN FROM THE EYE, NOT FROM THE EAR. `hidden` is display:none, and a
+   live region mutated inside a display:none subtree announces nothing - so the
+   one transition that matters, live to error, was silent for a screen reader
+   precisely because the word had been redundant a moment earlier. Off-screen
+   instead: the eye sees the tab it repeats, the ear still hears the change. */
 function say(s, why){ right.dataset.state = s; stateEl.textContent = s;
-                      stateEl.hidden = (s === 'live' || s === 'frozen');
+                      stateEl.classList.toggle('sr', s === 'live' || s === 'frozen');
                       stateEl.title = why || ''; }
 async function reason(r){ try { return (await r.json()).error || ''; } catch(err) { return ''; } }
 
 $('mode').onclick = (e) => {
   const b = e.target.closest('button'); if(!b) return;
   frozen = b.dataset.v === 'hold';
-  for(const x of $('mode').children) x.setAttribute('aria-selected', String(x === b));
+  for(const x of $('mode').children) x.setAttribute('aria-pressed', String(x === b));
   say(frozen ? 'frozen' : 'live');
 };
 
@@ -1357,10 +1754,30 @@ const pause = () => Math.round(1000 / (fps(onScreen()) * onScreen()));
    a server that has stopped answering rather than as a page with a bug in it.
    The body is a separate function now and the scheduling is the only thing
    this one does, so no defect inside a pass can take the loop with it. */
+/* ⛔ NOTHING IS POLLED WHILE NOBODY IS LOOKING. Four loops ran flat out in
+   a background tab: the frame pump at up to 40 requests a second, the address
+   every two, the fleet every three, a preview every four hundred
+   milliseconds. That budget was measured against what the pipe can carry
+   while the AGENT is using it - and the agent keeps working when the tab is
+   hidden, which is exactly when the page was still spending its share on
+   pictures nobody could see. The loops keep their rhythm so a page coming
+   back is one tick away from current. */
+/* ⛔ AND NOTHING IS POLLED FOR A CONVERSATION THAT NO LONGER EXISTS, which is
+   the same gate because it is the same question: is there anything here worth
+   asking about. See `vanish`. */
+const looking = () => !document.hidden && !vanished;
+
 async function tick(){
-  try { await onePass(); } catch(err) {}
+  if(looking()){ try { await onePass(); } catch(err) {} }
   setTimeout(tick, pause());
 }
+
+/* And the moment it is looked at again, before the next tick lands. */
+document.addEventListener('visibilitychange', () => {
+  if(!looking()) return;
+  onePass().catch(() => {});
+  paintWhere(); drawFleet();
+});
 
 async function onePass(){
   const cells = [...$('stage').children];
@@ -1370,69 +1787,88 @@ async function onePass(){
     const id = cell.dataset.id;
     if(cell.dataset.blank === '1'){ say(cells.length > 1 ? 'live' : 'idle'); }
     else try {
-      const r = await fetch(at('/live/frame?b=' + encodeURIComponent(id)
-                               + '&t=' + Date.now()), {cache:'no-store'});
+      const r = await door('/live/frame?b=' + encodeURIComponent(id)
+                           + '&t=' + Date.now(), {cache:'no-store'});
       if(r.status === 204){ blank(cell, 'no page yet'); if(id === watched()) say('idle'); }
       else if(r.ok){
         const im = cell.querySelector('img'), blob = await r.blob(), old = im.src;
         im.src = URL.createObjectURL(blob);
         if(old && old.startsWith('blob:')) URL.revokeObjectURL(old);
         im.hidden = false;
-        cutTheChrome(cell, im);
-        const ph = cell.querySelector('.ph'); if(ph) ph.hidden = true;
-        cell.dataset.at = String(Date.now());
+        shapeFrom(cell, im);
+        setState(cell, 'live');
+        /* The monotonic clock, like the step timer and the thinking timer:
+           a wall clock corrected by NTP or a DST step marks every screen
+           stale at once, or hides one that really is. */
+        cell.dataset.at = String(Math.round(performance.now()));
         if(id === watched()) say('live');
       }
       /* The capture could not answer, and the body says why: no frame within
          the server's wait (a minimised window is captured as nothing), or an
-         engine without the screencast. The last frame stays on screen either
-         way - a picture of where the browser was beats a blank pane - which is
-         exactly why the age below has to be told. */
-      else if(r.status === 503 && id === watched()){ say('error', await reason(r)); }
-      else if(id === watched()){ say('error'); }
+         engine without the screencast. The last frame stays on screen - a
+         picture of where the browser was beats a blank pane - and the reason
+         goes ON the screen rather than into a tooltip nobody hovers: this
+         used to leave the same black rectangle as a pane that had simply not
+         drawn yet, which is how a failure got to look like patience.
+         
+         And it is said for EVERY screen, not only the watched one. On a 2x2
+         the three you are not following are exactly the ones whose silence
+         you would otherwise have to guess at. */
+      else {
+        const why = r.status === 503 ? await reason(r) : '';
+        setState(cell, 'error', 'the capture failed',
+                 why || 'the server answered ' + r.status);
+        if(id === watched()) say('error', why);
+      }
     } catch(err){ if(id === watched()) say('offline'); }
     ageAll(cells);
   }
 }
 
 /* ⛔ THE BROWSER'S OWN CHROME IS CUT OFF THE TOP OF EVERY SCREEN. The capture
-   is the WINDOW - deliberately, because that is the only way the pointer is in
-   the picture - and the tab strip and the address bar come with it. They say
-   nothing the frame above does not already say, and at four-up they cost a
-   tenth of every screen to repeat it four times.
+   is a picture of a window, and the tab strip and the address bar in it are a
+   second address bar under the one this page already draws - the same fact
+   twice, in the place where the eye goes for the page itself. Measured on
+   three captures: 57/688, 43/515 and 57/688, so the chrome is 8.3% of the
+   window's height and that is a proportion rather than a number of pixels.
 
-   MEASURED rather than guessed, on four real captures: the chrome is 8.3% of
-   the picture (57 rows of 688, 43 of 515, 57 of 688). It is a fraction and not
-   a pixel count because the engine scales the window into the frame it sends,
-   so the rows change with the window while the proportion does not.
-
-   Clipped and shifted rather than scaled: the page keeps its size and its
-   shape, and what was the chrome becomes empty frame at the bottom. Scaling the
-   rest up to fill would make one screen's pixels a different size from
-   another's, which for pictures meant to be compared is worse than a band. */
+   ⛔ AND IT IS CUT WITH A MARGIN IN PERCENT, NOT WITH MEASURED PIXELS. A
+   percentage margin resolves against the containing block's width, so the
+   chrome expressed as a fraction of the picture's WIDTH crops the same slice at
+   any size, and the frame - which shrink-wraps the picture - ends up the
+   cropped height by construction. The version before this one read the box with
+   getBoundingClientRect on every frame, cached two numbers to avoid a reflow,
+   and had to be told again on every resize. */
 const CHROME = 0.083;
-function cutTheChrome(cell, im){
+function shapeFrom(cell, im){
   if(!im.naturalWidth) return;
-  const box = im.getBoundingClientRect();
-  /* What `object-fit:contain` with `object-position:top center` actually draws:
-     as wide as the box or as tall, whichever runs out first, anchored to the
-     top - so the top of the drawing is the top of the box. */
-  const drawn = Math.min(box.height, box.width * im.naturalHeight / im.naturalWidth);
-  const cut = Math.round(CHROME * drawn);
-  /* ⛔ AND THEN THE PICTURE IS CENTRED IN ITS CELL. Every browser here has
-     a window of a different shape - that is the point of the fingerprint, not a
-     bug to iron out - so on a 2x2 the pictures come out different heights.
-     Measured on four live browsers: three cells drawing 304px of image and one
-     drawing 237px. Top-anchored, that one read as a smaller screen with a hole
-     under it, 29% of the cell empty against 8% for its neighbours. The leftover
-     split above and below reads as a frame instead, which is what it is: same
-     cell, same border, a picture of a different shape inside it. */
-  const lift = Math.round((box.height - (drawn - cut)) / 2);
-  const both = cut + ':' + lift;
-  if(cell.dataset.cut === both) return;
-  cell.dataset.cut = both;
-  im.style.clipPath = 'inset(' + cut + 'px 0 0 0)';
-  im.style.transform = 'translateY(' + (lift - cut) + 'px)';
+  const key = im.naturalWidth + 'x' + im.naturalHeight;
+  if(cell.dataset.shape === key) return;
+  cell.dataset.shape = key;
+  const box = cell.querySelector('.frame');
+  if(!box) return;
+  const seen = im.naturalHeight * (1 - CHROME);
+  box.style.setProperty('--cut',
+    (CHROME * im.naturalHeight / im.naturalWidth * 100).toFixed(3) + '%');
+  box.style.setProperty('--arn', (im.naturalWidth / seen).toFixed(4));
+}
+
+/* ⛔ ONE PLACE DECIDES WHAT A SCREEN IS SHOWING, because four states used to
+   draw one black rectangle: no frame yet, no tab, stopped answering, and a
+   capture that failed were pixel-identical, and all four read as a product
+   that is broken. `data-blank` is a different question - whether to ASK for a
+   picture at all - and it stays where it was: a browser with no tab is not
+   asked, because asking spends a round trip to be told there is nothing. */
+function setState(cell, state, title, detail){
+  cell.dataset.state = state;
+  const veil = cell.querySelector('.veil');
+  if(!veil) return;
+  veil.hidden = state === 'live';
+  veil.textContent = '';
+  if(state === 'live') return;
+  if(state === 'waiting') veil.appendChild(el('span','pulse'));
+  if(title) veil.appendChild(el('b', null, title));
+  if(detail) veil.appendChild(el('span', null, detail));
 }
 
 /* ⛔ A PICTURE THAT HAS STOPPED MUST NOT READ AS ONE THAT IS RUNNING. On a
@@ -1441,15 +1877,28 @@ function cutTheChrome(cell, im){
    frame is still sitting there looking alive. Two seconds, because at four
    screens a round is 100 ms and a hiccup of three or four rounds is not news. */
 function ageAll(cells){
-  const now = Date.now();
+  const now = performance.now();
   for(const c of cells){
-    /* The placeholder cell has no caption to write into, which is how this
-       function killed the pump the first time it ran. */
-    const lab = c.querySelector('.age');
+    /* The empty stage has no stamp to write into, which is how this function
+       killed the pump the first time it ran. */
+    const lab = c.querySelector('.stamp');
     if(!lab) continue;
     const at2 = Number(c.dataset.at || 0), old = at2 && (now - at2) > 2000;
-    lab.textContent = old ? Math.round((now - at2) / 1000) + 's' : '';
-    lab.title = old ? 'no frame for this long' : '';
+    /* ⛔ ONLY WHEN IT CHANGES. This runs at the end of every pass, so up to
+       forty times a second, and it wrote three properties per cell whether or
+       not anything had moved - about 480 DOM writes a second at four screens,
+       for a label that is empty 99% of the time. Assigning '' to textContent
+       still replaces the node's children. */
+    const says = old ? Math.round((now - at2) / 1000) + 's' : '';
+    if(lab.textContent !== says){
+      lab.textContent = says;
+      lab.title = old ? 'no frame for this long' : '';
+    }
+    /* Guarded separately: the text is unchanged between two fresh passes but
+       the visibility still has to be right the first time. */
+    if(lab.hidden !== !old) lab.hidden = !old;
+    if(old && c.dataset.state === 'live') setState(c, 'stale');
+    else if(!old && c.dataset.state === 'stale') setState(c, 'live');
   }
 }
 
@@ -1486,8 +1935,7 @@ function paintTabs(rows){
    through the same tool an agent would call. */
 $('tabs').onclick = (e) => {
   const b = e.target.closest('button'); if(!b) return;
-  fetch(at('/live/select'), {method:'POST', headers:{'Content-Type':'application/json'},
-                         body: JSON.stringify({id: b.dataset.id})});
+  ask('/live/select', {id: b.dataset.id}, 'Could not switch to that tab');
 };
 
 /* ⛔ THE ADDRESS FOLLOWS THE SCREEN YOU ARE LOOKING AT, and with four of them
@@ -1508,17 +1956,27 @@ function severalOpen(n){
    until the next poll landed - two seconds showing one page's address over four
    screens. Calling `where` itself from a click would start a SECOND timer
    chain, which is how a pace stops being one number. */
-async function where(){ await paintWhere(); setTimeout(where, 2000); }
+async function where(){ if(looking()) await paintWhere(); setTimeout(where, 2000); }
 
 async function paintWhere(){
   const many = grid > 1 && !pinned2 && onStage().length > 1;
   if(many){ severalOpen(onStage().length); paintTabs([]); }
   else try {
     const who = watched();
-    /* `at` is what adds the question mark, so the browser goes in as one too
-       and it appends its own with an ampersand. */
-    const r = await fetch(at(who ? '/live/tabs?b=' + encodeURIComponent(who)
-                                 : '/live/tabs'), {cache:'no-store'});
+    /* ⛔ AND NEVER OF A BROWSER THAT IS NOT RUNNING. Asking for the tabs of a
+       declared-but-stopped browser STARTS it - the server resolves the id and
+       the registry wakes the engine - so clicking a stopped browser's chip
+       spent 800 MB and seven seconds nobody asked for, and then kept asking
+       every two seconds because the pin never cleared. The frame pump, the
+       preview row and both cell builders already know this rule; this was the
+       fifth place that had to and did not. */
+    if(who && !fleet.some(b => b.id === who && b.running)){
+      paintUrl(''); paintTabs([]); return;
+    }
+    /* `at`, inside `door`, is what adds the question mark, so the browser goes
+       in as one too and it appends its own with an ampersand. */
+    const r = await door(who ? '/live/tabs?b=' + encodeURIComponent(who)
+                             : '/live/tabs', {cache:'no-store'});
     if(r.ok){ const j = await r.json(); paintUrl(j.url || ''); paintTabs(j.tabs); }
   } catch(err){}
 }
@@ -1534,19 +1992,32 @@ async function drawChats(){
   catch(err){ return; }
   const box = $('chats');
   box.textContent = '';
+  /* An empty column is a state, not a blank: on a first run there is exactly
+     one conversation and it is this one, so the panel would otherwise open on
+     nothing at all. */
+  if(!rows.length){
+    const none = el('p','none', 'No saved conversations yet. This one is saved '
+                    + 'as soon as you send an instruction.');
+    box.appendChild(none);
+  }
   for(const s of rows){
     const row = el('div','chat');
     row.setAttribute('role','listitem');
     if(s.id === here) row.setAttribute('aria-current','true');
     const open = el('button', 'nm', s.name || s.id);
     open.type = 'button';
-    open.title = s.name || s.id;
+
     /* Switching is a NAVIGATION, not a repaint: the transcript, the picture and
        the stream all belong to the conversation, and the server hands back the
        whole of it for an id. Rebuilding that by hand would be a second
        implementation of what a page load already does correctly. */
     open.onclick = () => { if(s.id !== here) location.search = '?s=' + encodeURIComponent(s.id); };
     open.ondblclick = () => renameChat(s.id, s.name || s.id);
+    /* ⛔ AND A KEY, because a double click is not a keyboard path and nothing
+       on the screen advertises it. F2 is what renames a thing in a list
+       everywhere else on this machine. */
+    open.onkeydown = (e) => { if(e.key === 'F2') renameChat(s.id, s.name || s.id); };
+    open.title = (s.name || s.id) + ' - F2 to rename';
     row.appendChild(open);
     if(s.turns) row.appendChild(el('span','cnt', String(s.turns)));
     const kill = el('button','x','x');
@@ -1586,8 +2057,13 @@ try { showRail(localStorage.getItem(RAILKEY) === '1'); } catch(err){ showRail(fa
 async function renameChat(id, was){
   const name = prompt('Name this session', was);
   if(name === null) return;
-  await fetch('/sessions/rename', {method:'POST', headers:{'Content-Type':'application/json'},
-                                   body: JSON.stringify({id, name})});
+  /* The server refuses a name that is only spaces and says so with
+     `renamed:false`; without reading it the column simply redrew the old
+     name, which reads as the rename having been ignored. */
+  const r = await ask('/sessions/rename', {id, name}, 'Could not rename it');
+  if(r && !(await r.json()).renamed){
+    orphan('err', 'A session needs a name with something in it.');
+  }
   drawChats();
 }
 
@@ -1595,15 +2071,37 @@ async function forgetChat(id, name){
   /* The browsers go with it, and that is worth saying before it happens rather
      than after: a session can be holding eight logged-in engines. */
   if(!confirm('Delete "' + name + '"? Its conversation and its browsers go with it.')) return;
-  await fetch('/sessions/forget', {method:'POST', headers:{'Content-Type':'application/json'},
-                                   body: JSON.stringify({id})});
+  /* ⛔ AND THE ANSWER IS READ. The server REFUSES to delete a session whose
+     agent is mid-run, and answers 200 with `forgotten:false`. Ignoring the
+     body meant confirming a delete, being navigated away, and leaving the
+     session and its browsers exactly where they were: every visible signal
+     said it had worked. */
+  let gone = false;
+  try {
+    const r = await fetch('/sessions/forget', {method:'POST',
+                          headers:{'Content-Type':'application/json'},
+                          body: JSON.stringify({id})});
+    gone = r.ok && (await r.json()).forgotten;
+  } catch(err){ gone = false; }
+  if(!gone){
+    orphan('err', 'That session is still working, so it was not deleted. '
+           + 'Stop its run first, then delete it.');
+    drawChats();
+    return;
+  }
   if(id === here){ location.search = ''; return; }
   drawChats();
 }
 
-$('newchat').onclick = async () => {
-  const r = await fetch('/sessions/new', {method:'POST'});
-  if(!r.ok) return;
+$('newchat').onclick = async (e) => {
+  /* ⛔ AND ONLY ONCE. Two fast clicks made two sessions, the second
+     navigation won, and the first stayed behind as an empty conversation
+     nobody asked for and nobody would ever open. */
+  const b = e.currentTarget;
+  if(b.disabled) return;
+  b.disabled = true;
+  const r = await ask('/sessions/new', undefined, 'Could not start a session');
+  if(!r){ b.disabled = false; return; }
   const j = await r.json();
   location.search = '?s=' + encodeURIComponent(j.id);
 };
@@ -1638,9 +2136,27 @@ let pinned2 = null;
 const watched = () => pinned2 || focusHere;
 
 function thumbFor(b){
+  /* ⛔ A BROWSER WITH NO PICTURE DOES NOT GET A PICTURE FRAME. Six declared
+     but stopped browsers drew six 168x133 cards, each with the words `not up`
+     in the middle of an empty rectangle - a gallery of failures under the
+     stage, 133px tall, in the place the running ones live. A thing with no
+     image is a NAME: it gets a chip, and the row becomes a list of what this
+     session holds. Clicking one still asks to watch it, exactly as before. */
+  if(!b.running){
+    const chip = document.createElement('button');
+    chip.type = 'button'; chip.className = 'chip'; chip.dataset.id = b.id;
+    chip.title = 'Watch ' + b.id;
+    /* Clicking a chip changes what the address bar and the stage follow, and
+       nothing said so: the identical control one row up, the preview card,
+       has carried this mark from the start. */
+    chip.setAttribute('aria-current', String(b.id === watched()));
+    chip.append(el('span','off'), el('span','id', b.id));
+    chip.onclick = () => watchThis(b.id);
+    return chip;
+  }
   const el2 = document.createElement('button');
   el2.type = 'button'; el2.className = 'thumb'; el2.dataset.id = b.id;
-  el2.title = 'Send this session’s commands to ' + b.id;
+  el2.title = 'Watch ' + b.id;
   const pic = el('div','pic');
   /* Three states, not two, and the third is the one that read as a failure.
      A browser that is RUNNING WITH NO TAB cannot be captured - the engine
@@ -1648,14 +2164,14 @@ function thumbFor(b){
      so, then paints ERROR over something that is simply empty. The tabs are
      already in the answer this pane was built from, so the question is asked
      of data rather than of the pipe. */
-  if(b.running && (b.urls || []).length){
+  if((b.urls || []).length){
     const im = document.createElement('img'); im.alt = ''; pic.appendChild(im);
   } else {
-    pic.appendChild(el('span', null, b.running ? 'no page yet' : 'not up'));
+    pic.appendChild(el('span', null, 'no tab open'));
   }
   const cap = el('div','cap');
   cap.appendChild(el('span','id', b.id));
-  cap.appendChild(el('span','st', b.running ? '' : 'idle'));
+  cap.appendChild(el('span','st', ''));
   if(b.id === focusHere){
     const dot = el('span','dot');
     dot.title = 'the agent is working here';
@@ -1690,39 +2206,56 @@ function onStage(){
   return first.concat(live.filter(b => b.id !== w)).slice(0, grid);
 }
 
+/* ⛔ A BLOB URL IS NOT GARBAGE-COLLECTED WITH ITS ELEMENT. Every frame is
+   an object URL, and the two rebuild paths threw their <img> away without
+   revoking: the stage redraws whenever the agent moves to another browser -
+   which it does on its own - so a long run leaked one full window capture per
+   pane per switch, held until the tab closes. */
+function dropFrames(box){
+  for(const im of box.querySelectorAll('img')){
+    if(im.src && im.src.startsWith('blob:')) URL.revokeObjectURL(im.src);
+  }
+}
+
 function blank(cell, why){
   const im = cell.querySelector('img'); if(im) im.hidden = true;
-  const ph = cell.querySelector('.ph');
-  if(ph){ ph.hidden = false; ph.textContent = why; }
+  setState(cell, 'nopage', why || 'no tab open',
+           'ask the agent to open a page here');
   cell.dataset.blank = '1';
   cell.dataset.at = '';
 }
 
+/* One screen: a frame that wraps the picture, the name written on it, and
+   whatever the picture cannot say written over it. */
 function screenFor(b, current){
   const cell = document.createElement('button');
   cell.type = 'button'; cell.className = 'screen'; cell.dataset.id = b.id;
   cell.setAttribute('aria-current', String(current));
   cell.title = 'Watch ' + b.id;
-  const shot = el('div','shot');
+  const box = el('div','frame');
   const im = document.createElement('img'); im.alt = ''; im.hidden = true;
+  const tag = el('span','tag');
+  tag.appendChild(el('span','id', b.id));
+  /* The one the agent is driving, marked rather than selected: the person's
+     eye and the agent's hand are two different things and the tag says both. */
+  if(b.id === focusHere){
+    const dot = el('span','dot');
+    dot.title = 'the agent is working here';
+    tag.appendChild(dot);
+  }
+  const stamp = el('span','stamp'); stamp.hidden = true;
+  box.append(im, el('div','veil'), tag, stamp);
+  cell.appendChild(box);
   /* Three states and not two, and the third is the one that reads as a
      failure: a browser that is RUNNING WITH NO TAB cannot be captured - the
      engine answers "no such tab" - and asking anyway spends a round trip to be
      told so. The tabs are already in the answer this was built from, so the
      question is asked of data rather than of the pipe. */
-  const ph = el('span','ph', (b.urls || []).length ? '' : 'no page yet');
-  ph.hidden = (b.urls || []).length > 0;
-  shot.append(im, ph);
-  const cap = el('div','cap');
-  cap.appendChild(el('span','id', b.id));
-  cap.appendChild(el('span','age', ''));
-  if(b.id === focusHere){
-    const dot = el('span','dot');
-    dot.title = 'the agent is working here';
-    cap.appendChild(dot);
-  }
-  cell.append(shot, cap);
-  if(!(b.urls || []).length) cell.dataset.blank = '1';
+  const has = (b.urls || []).length > 0;
+  if(has) setState(cell, 'waiting', 'waiting for the first frame');
+  else { setState(cell, 'nopage', 'no tab open',
+                  'ask the agent to open a page here');
+         cell.dataset.blank = '1'; }
   cell.onclick = () => watchThis(b.id);
   return cell;
 }
@@ -1742,17 +2275,29 @@ function drawStage(){
               + '|' + grid + '|' + watched();
   if(box.dataset.sig === sig) return;
   box.dataset.sig = sig;
+  dropFrames(box);
   box.textContent = '';
   turnOf = 0;
+  /* ⛔ THE QUESTION IS 'IS THERE ANYTHING TO SEE', NOT 'ARE THERE
+     BROWSERS'. With a browser running and no tab open, the bar stayed fully
+     armed - address, Live/Frozen, layout picker and the word IDLE - over a
+     stage whose own words were `no tab open`. A screen with nothing on it is
+     the same empty room to the person looking at it. */
+  const anything = show.some(b => (b.urls || []).length);
+  right.dataset.empty = anything ? '' : '1';
+  /* Not decoration: `inert` removes them from the tab order and from the
+     accessibility tree, which is what 'this control cannot do anything right
+     now' has to mean for somebody who is not using a mouse. */
+  for(const box of [$('mode'), $('grid')]) box.inert = !anything;
   if(!show.length){
-    const cell = el('div','screen');
-    cell.dataset.blank = '1';
-    const shot = el('div','shot');
     /* An empty state that only reports the emptiness leaves the person to
        guess where the button is. There is no button - browsers are opened by
-       asking - so this is the one place that has to say so. */
-    shot.appendChild(el('span','ph', 'no browser yet - ask for one in the chat'));
-    cell.append(shot, el('div','cap'));
+       asking - so this is the one place that has to say so, and to show the
+       shape of the sentence that does it. */
+    const cell = el('div','empty');
+    cell.append(el('b', null, 'No browser open'),
+                el('span', null, 'Ask in the chat and one opens here. There is no button for it, on purpose.'),
+                el('code', null, 'open a browser and go to example.com'));
     box.appendChild(cell);
     return;
   }
@@ -1774,7 +2319,7 @@ $('grid').onclick = (e) => {
 
 async function drawFleet(){
   let got = {browsers: []};
-  try { const r = await fetch(at('/live/browsers'), {cache:'no-store'});
+  try { const r = await door('/live/browsers', {cache:'no-store'});
         if(r.ok) got = await r.json(); }
   catch(err){ return; }
   fleet = got.browsers || [];
@@ -1800,6 +2345,7 @@ function drawStrip(){
                     .join(',') + '|' + watched() + '|' + grid;
   if(box.dataset.sig !== sig){
     box.dataset.sig = sig;
+    dropFrames(box);
     box.textContent = '';
     for(const b of others) box.appendChild(thumbFor(b));
     nextPane = 0;
@@ -1816,12 +2362,12 @@ async function slowTick(){
      and asking would START it - 800 MB and seven seconds to fill a thumbnail
      nobody asked for. Same rule the live pane follows. */
   const shown = [...box.children].filter(t => t.querySelector('img'));
-  if(shown.length){
+  if(shown.length && looking()){
     const t = shown[nextPane % shown.length];
     nextPane++;
     try {
-      const r = await fetch(at('/live/frame?b=' + encodeURIComponent(t.dataset.id)
-                               + '&t=' + Date.now()), {cache:'no-store'});
+      const r = await door('/live/frame?b=' + encodeURIComponent(t.dataset.id)
+                           + '&t=' + Date.now(), {cache:'no-store'});
       if(r.ok && r.status !== 204){
         const im = t.querySelector('img'), blob = await r.blob(), was = im.src;
         im.src = URL.createObjectURL(blob);
@@ -1832,7 +2378,7 @@ async function slowTick(){
   setTimeout(slowTick, SLOW_MS);
 }
 
-async function fleetPoll(){ await drawFleet(); setTimeout(fleetPoll, 3000); }
+async function fleetPoll(){ if(looking()) await drawFleet(); setTimeout(fleetPoll, 3000); }
 
 /* Whatever was waiting when the page went away comes back into the composer
    rather than into the queue: the run it was queued behind is over, so the
@@ -1873,6 +2419,10 @@ function splitReset(){
   $('left').style.width = '';
   $('split').setAttribute('aria-valuenow',
                           String(Math.round($('left').getBoundingClientRect().width)));
+  /* The ceiling too: this is the FIRST-RUN path, so without it a range widget
+     was announced with a floor and a value and no top for every new user. */
+  $('split').setAttribute('aria-valuemax',
+                          String(Math.max(420, window.innerWidth - 480)));
 }
 
 function splitter(){
@@ -1885,6 +2435,7 @@ function splitter(){
   bar.addEventListener('pointerdown', e => {
     bar.setPointerCapture(e.pointerId);
     bar.dataset.drag = '1';
+    edge = $('left').getBoundingClientRect().left;
     /* ⛔ FOCUS BY HAND, BECAUSE THE LINE BELOW TAKES IT AWAY. preventDefault on
        pointerdown stops the drag from selecting the text beside it, and it also
        stops the browser from focusing what was pressed - so the separator could
@@ -1894,12 +2445,24 @@ function splitter(){
     bar.focus();
     e.preventDefault();
   });
+  /* ⛔ ONE WRITE PER FRAME, AND ONE TO DISK PER DRAG. Every pointermove read
+     the pane's box and then wrote a width and a value to localStorage: at a
+     120 Hz pointer that is 120 forced layouts and 120 synchronous storage
+     writes per second of dragging, for a number nobody reads until the drag
+     ends. The left edge does not move while dragging, so it is measured once
+     when the drag starts. */
+  let edge = 0, pending = 0;
   bar.addEventListener('pointermove', e => {
     if(!bar.dataset.drag) return;
-    splitTo(e.clientX - $('left').getBoundingClientRect().left, true);
+    const x = e.clientX;
+    if(pending) return;
+    pending = requestAnimationFrame(() => { pending = 0; splitTo(x - edge, false); });
   });
   bar.addEventListener('pointerup', e => {
     delete bar.dataset.drag;
+    if(pending){ cancelAnimationFrame(pending); pending = 0; }
+    /* Remembered once, at the end: the value it lands on is the choice. */
+    splitTo($('left').getBoundingClientRect().width, true);
     bar.releasePointerCapture(e.pointerId);
   });
   bar.addEventListener('dblclick', splitReset);
@@ -2147,6 +2710,20 @@ class ChatService:
                 self.save()
 
 
+class SessionGone(Exception):
+    """A request named a conversation that does not exist.
+
+    Its own class rather than an HTTPException so the one handler that answers
+    it lives beside the routes instead of inside each of them: eight routes
+    resolve a session and every one of them would otherwise carry the same
+    three lines, which is how a rule stops being enforced one route later.
+    """
+
+    def __init__(self, session_id: str) -> None:
+        super().__init__(session_id)
+        self.session_id = session_id
+
+
 class Sessions:
     """Every conversation this interface holds, by id, saved as it goes.
 
@@ -2226,6 +2803,38 @@ class Sessions:
         out.sort(key=lambda r: (r.get("saved") or "", r["id"]), reverse=True)
         return out
 
+    def knows(self, session_id: str | None) -> bool:
+        """Whether this conversation exists, WITHOUT bringing it into being.
+
+        ⛔ THE QUESTION EVERY REQUEST HAS TO ASK BEFORE `get`. Building what it
+        does not find is right for a caller that MEANS to start a conversation -
+        `new`, an embedder, a test - and wrong for a request that only means to
+        look at one. Measured: a page left open on a session somebody deleted
+        went on asking `/live/browsers` every three seconds, and one of those
+        questions was enough to declare the session again. The delete worked,
+        answered `forgotten:true`, closed the browsers, erased the file - and the
+        row came back on its own, empty and unnamed, for as long as that tab
+        stayed open. Every visible signal said the delete had failed.
+
+        ⛔ AND IT ASKS ABOUT BOTH HALVES OF A SESSION, because a session is a
+        conversation AND its browsers and either half can be the only one on
+        disk. An agent client that opens a browser in session `work` and never
+        touches this interface writes the browsers and no transcript; opening
+        `?s=work` here has to work, and asking only about transcripts would have
+        refused it. That is the same defect this method exists to fix, made one
+        step further along - which is why it is written into the one question
+        rather than into the routes that ask it.
+
+        Each half is asked of whoever owns it: what is in memory of this
+        registry, what is on disk of the store. The default is always known
+        because it is the conversation a page with no id gets, and on a fresh
+        install nothing has written it down yet.
+        """
+        at = session_id or DEFAULT_CHAT_ID
+        return (at == DEFAULT_CHAT_ID or at in self._live
+                or store.load_chat(at) is not None
+                or store.load(at) is not None)
+
     def rename(self, session_id: str, name: str) -> bool:
         clean = " ".join((name or "").split())[:80]
         if not clean:
@@ -2245,6 +2854,13 @@ class Sessions:
         half, and it exists for exactly this.
 
         Refused while that conversation is mid-run: the same reason `reset` is.
+
+        ⛔ AND `False` MEANS THAT AND NOTHING ELSE. It used to mean "there was
+        nothing to erase" as well, and the two are opposite news: the page reads
+        it and says "that session is still working, so it was not deleted", which
+        for a session somebody else had already deleted is the wrong sentence in
+        both halves. The caller asked for it to be gone; if it is gone, the
+        answer is yes.
         """
         service = self._live.get(session_id)
         if service is not None and service.busy:
@@ -2258,10 +2874,24 @@ class Sessions:
             # not work, when the half they were looking at did.
             pass
         self._live.pop(session_id, None)
-        return store.erase_chat(session_id) or service is not None
+        store.erase_chat(session_id)
+        return True
 
 
 def build_app(link: Link, sessions: "Sessions") -> Starlette:
+    def named(session_id: str | None) -> ChatService:
+        """The conversation with this id, refusing one nobody declared.
+
+        ⛔ ONE PLACE TURNS AN ID OFF THE WIRE INTO A CONVERSATION, because the
+        id does not always arrive the same way: eight routes carry it in the
+        query string and the rename carries it in the body. Written twice, the
+        rename is where it would have gone on resurrecting deleted sessions
+        after the eight beside it had stopped.
+        """
+        if not sessions.knows(session_id):
+            raise SessionGone(session_id or "")
+        return sessions.get(session_id)
+
     def which(request: Request) -> ChatService:
         """The conversation this request is about.
 
@@ -2271,8 +2901,13 @@ def build_app(link: Link, sessions: "Sessions") -> Starlette:
         picture on the right belonging to somebody else's browser. A caller that
         names nothing gets the default conversation, which is what every page
         written before this existed does.
+
+        ⛔ AND IT REFUSES AN ID NOBODY DECLARED, instead of declaring it. A
+        request is a way to look at a conversation, never a way to start one -
+        `/sessions/new` is. See `Sessions.knows` for what a page left open on a
+        deleted session did to it.
         """
-        return sessions.get(request.query_params.get("s"))
+        return named(request.query_params.get("s"))
 
     async def root(_request: Request) -> HTMLResponse:
         return HTMLResponse(PAGE)
@@ -2288,8 +2923,9 @@ def build_app(link: Link, sessions: "Sessions") -> Starlette:
     async def rename_session(request: Request) -> JSONResponse:
         body = await request.json()
         at = (body or {}).get("id") or DEFAULT_CHAT_ID
+        service = named(at)
         done = sessions.rename(at, (body or {}).get("name", ""))
-        return JSONResponse({"renamed": done, "name": sessions.get(at).name})
+        return JSONResponse({"renamed": done, "name": service.name})
 
     async def forget_session(request: Request) -> JSONResponse:
         body = await request.json()
@@ -2548,7 +3184,20 @@ def build_app(link: Link, sessions: "Sessions") -> Starlette:
         await which(request).link.call("session_select_page", {"page_id": page_id})
         return JSONResponse({"ok": True})
 
-    return Starlette(routes=[
+    async def vanished(_request: Request, exc: Exception) -> JSONResponse:
+        """410, because the conversation existed and does not any more.
+
+        Not 404: the page asking is a page that HAD this conversation open, and
+        the difference between "there is no such thing" and "this is over" is
+        the difference between a page that says something wrong happened and a
+        page that says what happened. It is also the only status the page reads
+        as a reason to stop asking - anything else is a failure worth retrying.
+        """
+        return JSONResponse({"error": "this conversation was deleted",
+                             "id": getattr(exc, "session_id", "")},
+                            status_code=410)
+
+    return Starlette(exception_handlers={SessionGone: vanished}, routes=[
         Route("/", root),
         Route("/sessions", listing),
         Route("/sessions/new", new_session, methods=["POST"]),
