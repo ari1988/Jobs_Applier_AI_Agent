@@ -130,35 +130,49 @@ PAGE = r"""<!doctype html>
      accessibility guidance marks `font-size: 16px` "Don't" and `1rem` "Do" for
      exactly this. Same pixels at the default 16px root, so nothing moves for
      anybody who never changed it. */
-  /* ⛔ ONE RATIO, AND THE STEPS ARE STEPS. Measured on the running page, the
-     left column drew NINE size/weight pairs at 11, 12, 13, 14 and 16px: four
-     sizes inside three pixels, which is a scale in name only. A step of 1.08
-     is not a step - the eye reads it as an accident - and the fix is not more
-     sizes but fewer, with weight and colour carrying the tiers that size no
-     longer does.
+  /* ⛔ EVERY SIZE HERE IS A PUBLISHED NUMBER, NOT A JUDGEMENT. Asked for in
+     those words, and it is the right way round: a scale somebody invents is a
+     scale nobody can check.
 
-     Three prose steps on ~1.2: 12 / 15 / 18. Body is 15 because this column
-     exists to be read and 14 is under the floor every source gives for reading
-     text. */
+       16px body    Material's default body size and the web's, and the number
+                    every one of the sources names first.
+       12px label   the comfortable floor for labels and captions; 11 is the
+                    absolute minimum and this is a step above it.
+       20px heading 1.25 from the body, inside the 1.2 to 1.333 ratio band all
+                    of them give for a type scale.
+
+     12 / 16 / 20, so the steps are 1.33 and 1.25. Levels that share a size are
+     separated by weight and colour, which those sources prefer to size anyway.
+
+     ⛔ MONO IS OFF THIS SCALE BY DECISION, at the 13px those same sources put
+     on code - a mono face runs wider and reads larger at the same pixel, and
+     the step track is MEASURED against it, so moving it moves a threshold a
+     gate checks. */
   --t-label:.75rem;                            /* 12 - labels, meta, counts */
-  --t-body:.9375rem;                           /* 15 - prose, and the base */
-  --t-ui:.9375rem;                             /* 15 - chrome reads as prose */
-  /* ⛔ MONO IS OFF THIS SCALE BY DECISION, NOT BY OVERSIGHT. A mono face runs
-     wider and reads larger at the same pixel, so it does not belong on a scale
-     built for a proportional one - and the step track is MEASURED against it:
-     `LONG` is how many characters fit in 416px at this size, so moving it moves
-     a threshold that a gate checks. It is the data face, and it says so here. */
+  --t-body:1rem;                               /* 16 - prose, and the base */
+  --t-ui:1rem;                                 /* 16 - chrome reads as prose */
   --t-mono:.8125rem;                           /* 13 - steps, code, addresses */
-  /* The answer's headings. One size above the body, then weight and colour:
-     three sizes a pixel apart carried nothing that 600 and a quieter ink do
-     not carry better. `--t-h1` is the off-screen page heading's size too. */
-  --t-h1:1.125rem; --t-h2:.9375rem; --t-h3:.9375rem;
+  --t-h1:1.25rem; --t-h2:1rem; --t-h3:1rem;    /* 20, then weight and colour */
 
   --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:20px; --s6:32px;
   --r-sm:4px; --r:8px; --r-lg:12px; --r-pill:999px;
-  --spine:54px;                               /* the sessions band */
-  --topbar:50px;                              /* every header, one height */
-  --h-ctl:28px;                               /* every control on a bar */
+  /* ⛔ AND SO IS EVERY BOX, FOR THE SAME REASON.
+
+       48px rail    Material's touch target, and the width a strip of icon
+                    buttons has in every product that ships one.
+       56px bar     Material's top app bar. By Jakob's law that is the height
+                    an eye already expects at the top of a window.
+       40px control the standard button height these sources give (36 to 40),
+                    taken at the top so a pill in a bar is comfortable rather
+                    than merely legal.
+
+     All three are multiples of the 4px base this file spends everywhere else.
+     The header used to be 50 - twelve and a half steps, which is not a step,
+     and the kind of number nobody questions because it looks round in decimal. */
+  --spine:48px;                               /* the sessions rail */
+  --drawer:256px;                             /* the standard drawer's width */
+  --topbar:56px;                              /* every header, one height */
+  --h-ctl:40px;                               /* every control on a bar */
   --gutter:1.75rem;                            /* three digits of 11px mono */
   --gap:.55rem;
   --indent:calc(var(--gutter) + var(--gap));   /* ONE source for the step indent */
@@ -219,75 +233,95 @@ code,pre,.g,.meta,.badge,#url{
    Anchored to the spine's own width so the two are one object, and lifted with
    a shadow rather than a border, because what says "this is over that" is the
    shadow. */
-#rail { position:absolute; top:0; bottom:0; left:var(--spine); width:224px;
+#rail { position:absolute; top:0; bottom:0; left:0; width:var(--drawer);
         z-index:5; display:flex; flex-direction:column;
         background:var(--well); border-right:1px solid var(--line-1);
         box-shadow:14px 0 34px -18px #000 }
 /* The header of the column lines up with the header of the conversation beside
    it: same height, same padding, so the two read as one row across the app. */
+/* The left padding is the button's: it is drawn over this header now, so the
+   word starts after it instead of under it. */
 #railhead{ flex:none; height:var(--topbar); display:flex; align-items:center;
-           gap:8px; padding:0 var(--s3) 0 var(--s4);
+           gap:8px; padding:0 var(--s3) 0 var(--spine);
            border-bottom:1px solid var(--line-1) }
 #railhead .label{ flex:1 }
-#newchat{ flex:none; width:26px; height:26px; display:grid;
-          place-items:center; padding:0; border-radius:7px;
+#newchat{ flex:none; width:48px; height:48px; display:grid;
+          place-items:center; padding:0; border-radius:var(--r);
           border:1px solid transparent; background:none;
           color:var(--fg-3); cursor:pointer;
           transition:background-color 120ms ease-out, color 120ms ease-out }
 #newchat:hover{ background:var(--raised); color:var(--fg);
                 border-color:var(--line-2) }
 
-/* ⛔ THE THREE LINES WERE A GUESS AND THE WORD IS NOT, and the word belongs on
-   the EDGE. A hamburger says "there is a menu here" only to somebody who has
-   already learned that it does. Written into the frame instead, the full height
-   of the window, it is not a control among the header's other controls: it is
-   part of the room, always there, and the only way in or out of the column.
-   The type is `.label`'s, so the spine and the column it opens read as one word
-   in one voice.
-   `vertical-rl` turned upside down gives the word bottom to top, which is the
-   direction every spine on a shelf uses in this alphabet, and the direction the
-   napkin had it. */
-/* The accent runs the full height of the spine and stays there whether the
-   column is open or shut: asked for on 2026-09-09, and it is the better of the
-   two - a line that appears and disappears is a state indicator competing with
-   the background, while a line that is always there is the edge of the room,
-   and the open state has the background and the ink to say it. It also replaces
-   the hairline that used to separate this from what follows. */
-#railtab{ flex:none; width:var(--spine); padding:0; cursor:pointer; border:0;
+/* ⛔ AN ICON, AND THE WORD WHEN IT IS WANTED. The rail carried SESSIONS set
+   vertically, and the word was the whole objection: it is the only thing on
+   this page a person has to tilt their head for, and it names a category where
+   everything else on screen names an action - Clear, Live, Frozen, jump to
+   latest. Chosen from four variants drawn side by side at real proportions,
+   which is how it finally got decided after two guesses were wrong: a bar in
+   the header, and then leaving it alone.
+
+   44px instead of 54, so ten pixels go back to the conversation. The target is
+   still the full height of the window, as far above the 24px WCAG floor and the
+   44px Fitts figure as a target gets, and the accent on the edge stays: it was
+   asked for, and a line that is always there is the edge of the room rather
+   than a state indicator competing with the background.
+
+   The icon sits at the TOP and not in the middle. That is where a rail's first
+   control goes in every product that has one, and it leaves the strip able to
+   grow a second icon without anything being re-thought. */
+/* ⛔ THE RAIL IS THE FULL HEIGHT OF THE WINDOW AND STARTS AT THE TOP, so the
+   icon sits in the corner ABOVE the header's line rather than under it. Tried
+   the other way round for one commit - band across the whole width, rail
+   hanging below - and the owner asked for this one back. It is also the older
+   of the two: the strip belongs to the room, not to the pane beside it. */
+#railtab{ flex:none; width:var(--spine); padding:11px 0 0; cursor:pointer; border:0;
           position:relative; background:var(--base); color:var(--fg-3);
-          box-shadow:inset -1px 0 0 var(--accent);
-          /* The chevron and the word are two rows of one grid, centred
-             together: pinned to the top the arrow sat 450px from the word and
-             the two read as separate things on the same strip. */
-          display:grid; align-content:center; justify-items:center; gap:12px;
+
+          /* Half the weight it was: a hairline that says where the room ends
+             rather than a rule that draws attention to itself. */
+          box-shadow:inset -.5px 0 0 var(--accent);
+          display:flex; justify-content:center; align-items:flex-start;
           transition:background-color 120ms ease-out, color 120ms ease-out }
-/* ⛔ A WORD ON A WALL IS NOT A BUTTON. At 34px with nothing but letters it read
-   as a label somebody had printed on the frame, which is the one thing it must
-   not read as - said in those words on 2026-09-09. Wider, and with the same
-   chevron the step rows use, drawn from borders rather than an icon: it points
-   into the room when the column is shut and back out when it is open, so the
-   thing you press also says which way it goes. */
-#railtab::before{ content:""; width:5px; height:5px;
-                  border-right:1.5px solid currentColor;
-                  border-bottom:1.5px solid currentColor;
-                  transform:rotate(-45deg) translate(-1px, -1px);
-                  transition:transform 150ms ease }
-#railtab[aria-expanded="true"]::before{ transform:rotate(135deg) translate(-1px, -1px) }
-/* ⛔ THE TEXT TURNS, NOT THE BUTTON. `transform` on the button would rotate the
-   whole box with it, so the border and the accent below would be drawn on the
-   edge away from the column instead of the one beside it - correct in the
-   element's own coordinates and backwards on the screen. */
-/* On the label step like every other tracked uppercase word on the page: it
-   was the last size in this column that belonged to no scale. The tracking
-   stays wider than `.label` because the letters are stacked, not set. */
-#railtab span{ writing-mode:vertical-rl; transform:rotate(180deg);
-               font:600 var(--t-label)/1 var(--sans); letter-spacing:.2em;
-               text-transform:uppercase }
+#railtab svg{ flex:none; display:block }
+/* The word, on screen, the moment a pointer or the keyboard arrives. Drawn
+   rather than left to `title`: the native tooltip waits about a second, takes
+   the operating system's colours, and never appears for a keyboard at all. */
+#railtab::after{ content:attr(data-tip); position:absolute; left:calc(100% + var(--s2));
+                 top:9px; white-space:nowrap; pointer-events:none; z-index:6;
+                 background:var(--top); color:var(--fg); font-size:var(--t-label);
+                 padding:4px 8px; border-radius:var(--r-sm);
+                 box-shadow:0 2px 8px rgba(0,0,0,.4);
+                 opacity:0; transition:opacity 125ms ease-out }
+#railtab:hover::after, #railtab:focus-visible::after{ opacity:1 }
+/* Open: the rail lifts a rung and the icon goes to full ink. The state is drawn
+   on the thing you press, where a hand already is - and the word goes quiet,
+   because the column beside it is now saying its own name. */
 #railtab:hover{ background:var(--raised); color:var(--fg) }
-/* Open: the spine lifts a rung and the word goes to full ink. The state is
-   drawn on the thing you press, where a hand already is. */
-#railtab[aria-expanded="true"]{ background:var(--raised); color:var(--fg) }
-#railtab[aria-expanded="true"] span{ display:none }
+/* ⛔ OPEN, THE RAIL GIVES ITS WIDTH AWAY. A 48px strip beside an open column is
+   48px that says nothing: the column beside it already carries the name, the
+   state and the way out. So the button leaves the flow - the conversation gets
+   those pixels back and the panel starts at the edge of the window - and is
+   drawn over the panel's own header, in the same place on screen it was a
+   moment ago.
+
+   Moved, not duplicated. It is the same button, and it has to be: a second
+   control that opens the same column is a second thing to keep in step with the
+   first, which this page carried for half an hour once and a gate now forbids.
+   It is also the only thing that CLOSES the column, so it cannot simply be
+   hidden. */
+/* ⛔ ABOVE THE PANEL, AND 5 IS THE PANEL. Both were 5, and the panel comes
+   later in the document, so it painted over the button: the icon was exactly
+   where it belonged, 48 by 56 at the top-left corner, and invisible. The
+   ladder this page uses is 2 for the jump button, 5 for the panel, 6 above it,
+   20 for the skip link. */
+#railtab[aria-expanded="true"]{ position:absolute; top:0; left:0; z-index:6;
+                                width:var(--spine); height:var(--topbar);
+                                padding:0; display:grid; place-items:center;
+                                background:transparent; box-shadow:none;
+                                color:var(--fg-2) }
+#railtab[aria-expanded="true"]:hover{ color:var(--fg); background:transparent }
+#railtab[aria-expanded="true"]::after{ content:none }
 /* ⛔ THE PANEL FOLDS, THE WAY IN DOES NOT. Both used to disappear at the
    same breakpoint, and `#newchat` lives inside the panel - so a window snapped
    to half a 1366-wide laptop lost every session control at once, with the only
@@ -320,8 +354,14 @@ code,pre,.g,.meta,.badge,#url{
    has no handler: the padding around the name was a pointer cursor over
    nothing, which is the honesty contract this file states for the browser bar
    thirty lines earlier and did not keep here. */
+/* 24px tall, because 23 is a miss. WCAG 2.5.8 puts the floor at 24 CSS px and
+   this row was one pixel under it - measured on the running page, not guessed.
+   The height comes from a min-height rather than padding: the row is a flex
+   child and padding would move the text off the baseline it shares with the
+   count beside it. */
 .chat .nm{ cursor:pointer; flex:1; min-width:0; overflow:hidden;
-           text-overflow:ellipsis;
+           text-overflow:ellipsis; min-height:24px; display:flex;
+           align-items:center;
            white-space:nowrap; border:0; background:none; color:inherit;
            font:inherit; text-align:left; padding:0 }
 #chats .none{ margin:0; padding:var(--s3) var(--s2); color:var(--fg-3);
@@ -353,10 +393,12 @@ code,pre,.g,.meta,.badge,#url{
    hands the rest to the right. Only desktops run this, so the floor is the
    narrow end of a laptop and there is no phone case to carry.
 
-   The ceiling is derived, not chosen: the thread caps at 66ch, which is 498px
-   in this font, plus the 32px of log padding it sits in. Anything wider would
-   be slack inside this pane rather than measure, and it is worth more to the
-   picture on the right. */
+   The ceiling here is the DEFAULT, not a limit: it is where the pane starts on
+   a screen nobody has dragged, chosen so the prose sits at its measure without
+   taking width the picture on the right can use. The splitter goes well past
+   it - up to the window minus 480 - and since the measure cap moved off the
+   transcript onto the prose, every pixel past this one goes to the step rows,
+   which is where it does something. Dragging used to widen nothing at all. */
 #left { width:clamp(420px, 44%, 530px); display:flex; flex-direction:column;
         position:relative }
 /* The separator carries the line that used to be `#left`'s right border, so
@@ -425,7 +467,7 @@ code,pre,.g,.meta,.badge,#url{
         padding:3px 9px; border-radius:var(--r-pill) }
 /* 24px is the floor WCAG 2.2 sets for a target, and these three sat at 21,
    22 and 23 - close enough to look fine and short enough to fail. */
-#fresh{ min-height:24px; font-size:var(--t-label); font-family:var(--sans);
+#fresh{ min-height:var(--h-ctl); font-size:var(--t-label); font-family:var(--sans);
         color:var(--fg-2);
         background:var(--raised); border:1px solid var(--line-2); cursor:pointer;
         padding:3px 9px; border-radius:var(--r-pill);
@@ -443,7 +485,17 @@ code,pre,.g,.meta,.badge,#url{
    One rule, so the look follows the mechanism rather than whoever remembers. */
 [inert]{ opacity:.3 }
 
-#log{ flex:1; overflow:auto; padding:var(--s5) var(--s4); scrollbar-gutter:stable }
+#log{ flex:1; overflow:auto; scrollbar-gutter:stable;
+      padding:var(--s5) var(--s4);
+      transition:padding-left 180ms cubic-bezier(.23,1,.32,1) }
+/* ⛔ IT PUSHES, IT DOES NOT COVER. An overlay drawer is the phone pattern;
+   on a desktop the standard one moves the content over, and covering it here
+   sliced every line of the conversation down the middle - readable text with
+   a panel sitting on its first 224 pixels. The header is not moved: it lives
+   above the drawer, which is what the drawing asked for. */
+#rail:not([hidden]) ~ #left #log,
+#rail:not([hidden]) ~ #left form{
+  padding-left:calc(var(--s4) + var(--drawer) - var(--spine)) }
 /* Capped in CHARACTERS and not in pixels, because the thing being limited is
    the measure and 680px is only one screen's worth of it: on a 1920 window the
    same column ran to about 92 characters, past the 80 the WCAG asks for and
@@ -474,7 +526,39 @@ code,pre,.g,.meta,.badge,#url{
    half on the LEFT, which reads as the column having been pushed away from the
    edge for no reason - 185px of nothing before the first character, in a
    screenshot. */
-#thread{ max-width:66ch; margin:0 }
+/* ⛔ THE MEASURE BELONGS TO THE PROSE, NOT TO THE COLUMN. The cap used to sit
+   here, on the whole transcript, so widening the pane widened NOTHING: dragged
+   from 530 to 1440, the conversation stopped growing at 534 and the rest of the
+   pane became margin. A control that offers a range in which nothing happens is
+   a control that lies, and this one was measured doing it.
+
+   Prose keeps the cap, because 200 characters a line is unreadable whatever the
+   window is. The step rows do NOT: they are monospace data, they were already
+   cut off at 48 characters with the rest behind a disclosure, and every pixel
+   the drag gives them is a pixel of address a person can read without opening
+   anything. Same for code blocks and tables, which scroll in their own box.
+
+   So dragging wider now widens the thing that was actually short. */
+#thread{ margin:0 }
+/* Every block of an answer, and then the two that are not prose taken back
+   out. Written as `> *` and not as a list of element selectors on purpose: a
+   compound starting with `h3.md-h` sits earlier in the file than the heading's
+   own rule, and two gates that read this stylesheet as text then find this one
+   first and check the wrong declarations. */
+/* ⛔ AND THEN THE CAP CAME OFF THE PROSE TOO, BECAUSE IT WAS THE PROSE THE
+   OWNER WAS LOOKING AT. Moving it off the transcript widened the step rows and
+   left the answer exactly where it was, which is the text a person actually
+   reads: dragged wide, the sentences still wrapped at the same place. Said
+   twice, the second time with a screenshot.
+
+   So the measure is not a number this file picks any more - it is the width of
+   the pane, and the separator is the control that sets it. That is a better
+   answer than a cap in either place: the person reading decides how wide their
+   own reading is, which is the one thing a fixed number can never get right for
+   everybody. The DEFAULT still lands inside 65-80 characters for anybody who
+   never drags, and there is a gate that recomputes exactly that from the pane's
+   own declared width rather than from a number written down here. */
+
 
 /* Bottom-pinning with no scroll handler and no epsilon: the sentinel is the only
    anchor the browser may keep, so content inserted before it pushes the view
@@ -736,7 +820,7 @@ form{ position:relative; padding:var(--s3) var(--s4) var(--s4);
    nothing in here gets a pointer cursor except what does. */
 #chrome, #chrome *{ cursor:default; user-select:none }
 #url{ user-select:text }
-#mode button{ cursor:pointer; min-height:24px }
+#mode button{ cursor:pointer; min-height:var(--h-ctl) }
 #dot{ width:7px; height:7px; flex:none; border-radius:50%; background:var(--fg-4) }
 [data-state="live"]  #dot{ background:var(--ok); animation:breathe 1.8s ease-in-out infinite }
 [data-state="busy"]  #dot{ background:var(--accent); animation:breathe .9s ease-in-out infinite }
@@ -1005,19 +1089,35 @@ form{ position:relative; padding:var(--s3) var(--s4) var(--s4);
      sits behind the entire transcript, and the queue grows with the run. One
      link, first in the document, off-screen until it is focused. -->
 <a class="skip" href="#i">Skip to the message box</a>
+<!-- ⛔ THE NAME IS AN `aria-label` HERE AND THAT IS NOT THE DEFECT IT WAS.
+     While the word was ON the button, a label REPLACED it: a screen reader read
+     something that was not on screen and a voice user could not say what they
+     saw. With a drawn icon there is no visible word to contradict, so the label
+     IS the name - and `data-tip` puts the same word on screen the moment a
+     pointer or the keyboard arrives, so the two can never disagree. -->
 <button id="railtab" type="button" aria-expanded="false" aria-controls="rail"
-        title="Sessions"><span>Sessions</span></button>
+        aria-label="Sessions" data-tip="Sessions">
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <rect x="2.8" y="4.4" width="18.4" height="15.2" rx="3"
+          stroke="currentColor" stroke-width="1.6"/>
+    <path d="M9.2 4.4v15.2" stroke="currentColor" stroke-width="1.6"/>
+  </svg></button>
 
-<nav id="rail" aria-label="Sessions" hidden>
+<nav id="rail" aria-labelledby="railtitle" hidden>
   <!-- No title here any more: the spine to the left of this column carries the
        word, and with the column open the two sat twenty pixels apart saying the
        same thing. The row keeps its height from its padding, so it still lines
        up with the app header beside it. -->
+  <!-- ⛔ THE WORD LIVES HERE NOW. It used to be on the rail, and this span was
+       deliberately empty because the two sat twenty pixels apart saying the same
+       thing. The rail draws an icon since 2026-09-10, so nothing carried the word
+       any more: the column opened with a plus button and no title, which is a
+       rule that stopped being enforced one step past where it was written. -->
   <div id="railhead">
-    <span class="label" aria-hidden="true"></span>
+    <span class="label" id="railtitle">Sessions</span>
     <button id="newchat" type="button" aria-label="New session" title="New session">
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor"
-           stroke-width="1.6" stroke-linecap="round"><path d="M7 2.5v9M2.5 7h9"/></svg>
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor"
+           stroke-width="1.6" stroke-linecap="round"><path d="M9 3.5v11M3.5 9h11"/></svg>
     </button>
   </div>
   <div id="chats" role="list"></div>
@@ -1063,21 +1163,21 @@ form{ position:relative; padding:var(--s3) var(--s4) var(--s4);
          it floats above. -->
     <button id="jump" hidden type="button">jump to latest</button>
     <button id="chip" type="button" hidden>1 message queued
-      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"
            stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
            stroke-linejoin="round"><path d="M10.6 2.9l2.5 2.5L5.6 12.9 2.5 13.5l.6-3.1z"/></svg></button>
     <div class="composer">
       <label class="sr" for="i">What should the agent do?</label>
       <textarea id="i" rows="1" placeholder="What should the agent do?"></textarea>
       <button id="go" type="submit" aria-label="Send" disabled>
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"
              stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
              stroke-linejoin="round">
-          <path d="M7 12V2M2.5 6.5L7 2l4.5 4.5"/></svg>
+          <path d="M9 15.5V2.5M3.5 8L9 2.5l5.5 5.5"/></svg>
       </button>
       <button id="halt" type="button" hidden aria-label="Stop">
-        <svg width="12" height="12" viewBox="0 0 12 12">
-          <rect width="12" height="12" rx="2" fill="currentColor"/></svg>
+        <svg width="14" height="14" viewBox="0 0 14 14">
+          <rect width="14" height="14" rx="3" fill="currentColor"/></svg>
       </button>
     </div>
   </form>
