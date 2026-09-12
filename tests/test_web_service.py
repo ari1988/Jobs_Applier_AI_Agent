@@ -277,7 +277,15 @@ async def test_the_app_exposes_exactly_the_routes_the_page_calls():
                      "/sessions", "/sessions/new", "/sessions/rename",
                      "/sessions/forget",
                      "/chat/send", "/chat/stop", "/chat/fresh", "/chat/events",
-                     "/live/frame", "/live/tabs", "/live/select",
+                     # ⛔ AND TWO MORE WENT AWAY ON 2026-09-11 with the tab
+                     # tools: /live/tabs, which drew the strip, and
+                     # /live/select, which let a click move the active page
+                     # under the agent - the same second-control defect the
+                     # four below were removed for. And /live/address, which
+                     # briefly replaced the strip, went the same day it was
+                     # measured to ask `browser_list` a second time for a
+                     # field /live/browsers already returns.
+                     "/live/frame",
                      # The workspace, added in 0.18.0: which browsers to draw a
                      # pane for, and which one the commands go to.
                      # ⛔ AND FOUR THAT WENT AWAY IN 0.21.0: /live/open,
@@ -390,9 +398,9 @@ class Result:
 #: What `browser_list` answers when there is something to look at. A double
 #: that can hand back a picture is a double with a browser running, so it has
 #: to say so: the views ask this first and draw nothing when the answer is no.
-RUNNING = ('{"session": "default", "focus": "main", "limit": 8, '
+RUNNING = ('{"focus": "main", "limit": 2, '
            '"browsers": [{"id": "main", "running": true, "focused": true, '
-           '"urls": []}]}')
+           '"url": "", "urls": []}]}')
 
 
 class WatchingLink(FakeLink):
@@ -663,8 +671,7 @@ async def test_the_stage_asks_for_frames_at_a_rate_it_has_measured():
     assert "fps(onScreen()) * onScreen()" in code, (
         "the pause is no longer derived from the screens actually on the stage")
 
-    decl = re.search(r"const LAYOUTS = \[[^\]]*\];\s*"
-                     r"const TOPRATE = \d+, CEILING = \d+;\s*"
+    decl = re.search(r"const TOPRATE = \d+, CEILING = \d+;\s*"
                      r"const fps = \(n\) => .+", code)
     assert decl, "the stage no longer declares the pace it keeps"
 
@@ -679,13 +686,18 @@ async def test_the_stage_asks_for_frames_at_a_rate_it_has_measured():
     # browsers running draws exactly three.
     js = decl.group(0) + chr(10) + (
         "process.stdout.write(JSON.stringify("
-        "[LAYOUTS, CEILING, [1,2,3,4].map(n => fps(n))]));")
+        "[CEILING, [1,2,3,4].map(n => fps(n))]));")
     done = subprocess.run([node, "-e", js], capture_output=True, text=True,
                           encoding="utf-8", timeout=30)
     assert done.returncode == 0, "the pace threw: %s" % done.stderr
-    layouts, ceiling, each = json.loads(done.stdout)
+    ceiling, each = json.loads(done.stdout)
 
-    assert layouts == [1, 2, 4], "the layouts on offer are %s" % layouts
+    # ⛔ THE LAYOUTS ARE GONE AND THE PACE IS STILL A FUNCTION OF n. There
+    # used to be a picker - one, two or four screens - and this gate read its
+    # options back. A session holds `main` and, while it is needed, `support`,
+    # so the stage draws one or two and nothing is chosen; the pace is asked
+    # for four anyway, because what it must never do is promise more frames
+    # than the pipe has, whatever number of screens a later change puts on it.
 
     from aihawk.mcp.session import StealthSession
 
@@ -888,82 +900,19 @@ async def test_a_page_that_joins_an_idle_service_is_told_the_turn_is_over():
 
 
 # --------------------------------------------------------------------------
-# the tab strip, which only became possible when the tool stopped lying
+# the address bar, which is what survived the tab strip
 # --------------------------------------------------------------------------
-
-class TabbedLink(FakeLink):
-    """`session_list_pages` answers `payload`; `browser_list` answers that the
-    browser is running, because a session with tabs to list has one."""
-
-    def __init__(self, payload, running=True):
-        super().__init__()
-        self._payload = payload
-        self._running = running
-
-    async def call_text(self, name, arguments=None):
-        await self.call(name, arguments)
-        if name == "browser_list":
-            return RUNNING if self._running else '{"focus": "", "browsers": []}'
-        return self._payload
-
-
-async def _tabs_route(link, svc=None):
-    app = build_app(link, Sessions.around(svc or ChatService(link, SilentBrain())))
-    return [r for r in app.routes if r.path == "/live/tabs"][0].endpoint
-
-
-async def test_the_address_comes_from_the_active_tab():
-    """One call where there were two.
-
-    While `session_list_pages` answered with ids only, this had to ask
-    `browser_evaluate` for `location.href`: script in the page, to learn
-    something the server already knew.
-    """
-    link = TabbedLink(json.dumps([
-        {"id": "tab-1", "title": "A", "url": "https://a.example/", "active": False},
-        {"id": "tab-2", "title": "B", "url": "https://b.example/x", "active": True},
-    ]))
-    route = await _tabs_route(link)
-
-    class Req: query_params = {}
-    body = json.loads((await route(Req())).body)
-
-    assert body["url"] == "https://b.example/x", "the address is the ACTIVE tab's"
-    assert [t["id"] for t in body["tabs"]] == ["tab-1", "tab-2"]
-    assert [n for n, _ in link.calls] == ["session_list_pages"], (
-        "the tabs in ONE call, and not browser_evaluate on top of it")
-
-
-async def test_an_older_server_leaves_the_strip_empty_instead_of_breaking_the_pane():
-    """A server that still answers `["tab-1"]` is not an error here. The picture
-    is the point of the pane; the strip is an extra that can be absent."""
-    link = TabbedLink(json.dumps(["tab-1", "tab-2"]))
-    link.touched = True
-    route = await _tabs_route(link)
-
-    class Req: query_params = {}
-    body = json.loads((await route(Req())).body)
-
-    assert body == {"url": "", "tabs": []}
-
-
-async def test_the_strip_never_causes_a_browser_to_start():
-    """Same invariant as the frame, and it has to be stated the same way.
-
-    `session_list_pages` resolves the browser through `ready`, which STARTS it,
-    so an empty strip drawn by asking is an empty strip that cost an engine.
-    Measured on 0.38.0: 9 processes before, 16 after, and the answer was
-    `{"url": "", "tabs": []}` either way.
-
-    Known-bad: a guard that reads whether any call has been made on the link.
-    """
-    link = TabbedLink("[]", running=False)
-    route = await _tabs_route(link)
-
-    class Req: query_params = {}
-    body = json.loads((await route(Req())).body)
-
-    assert body == {"url": "", "tabs": []}
-    assert [n for n, _ in link.calls] == ["session_list_pages"], (
-        "the strip asks once and reads the answer: %s"
-        % [n for n, _ in link.calls])
+#
+# ⛔ A BLOCK OF FOUR ROUTE TESTS STOOD HERE, AND THE ROUTE THEY TESTED IS
+# GONE. It began as `/live/tabs`, asking the tab tool; when a browser became
+# one page it was rewritten on `browser_list` - and at that moment it became
+# a second reader of the question `/live/browsers` was already asking, on a
+# second timer, for a field those rows carry.
+#
+# The choice it made - the row being WATCHED rather than the focused one,
+# and `url` rather than `urls[0]` - moved into the page as `addressOf`,
+# where it belongs: which browser a person is watching is a fact of the
+# page, and a pinned pane changes it faster than any poll can follow. Both
+# of those wrong answers look exactly like right ones, so they are held by a
+# gate that EXECUTES the function under a real engine, in
+# test_the_page_tells_the_truth.py, which is more than these four could do.

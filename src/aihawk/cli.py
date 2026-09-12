@@ -134,12 +134,25 @@ def ui(openrouter_key, model, host, port, proxy, seed, headed, binary, profile_d
     library's job - same engine, Playwright's whole API.
     """
     from .brain import OpenRouterBrain
-    from .link import Link
     from .llm import make_client
+    from .sessions import DEFAULT_CHAT_ID
     from .web import Sessions, build_app
 
-    key = openrouter_key or os.environ.get("OPENROUTER_API_KEY")
-    if not key:
+    # ⛔ THE RULE LIVES IN `llm.resolve_key`, AND UNTIL NOW THIS RE-IMPLEMENTED
+    # IT. Both said the same thing - the flag beats the variable, an empty one
+    # counts as absent, nothing at all is a refusal - which is exactly the
+    # shape that goes wrong quietly: `resolve_key` carried a dozen assertions
+    # pinning those edges and had no caller in the product, so the tested copy
+    # and the running copy were different code. Either could have drifted
+    # without a red test.
+    #
+    # What stays here is the PRESENTATION, which is genuinely the CLI's: a
+    # ClickException prints one line and exits 1 where a RuntimeError dumps a
+    # traceback, and the sentence names the library for somebody who wanted a
+    # browser rather than an agent.
+    try:
+        key = resolve_key(openrouter_key, os.environ)
+    except RuntimeError:
         raise click.ClickException(
             "no OpenRouter key. Pass --openrouter-key or set "
             "OPENROUTER_API_KEY. To drive the browser without a model, use "
@@ -160,18 +173,25 @@ def ui(openrouter_key, model, host, port, proxy, seed, headed, binary, profile_d
     async def serve() -> None:
         import uvicorn
 
-        link = await Link(opts, key=key).open()
-        click.echo("server   connected, %d tools" % len(link.tools))
-        click.echo("open     http://%s:%d" % (host, port))
-        sessions = Sessions(link, lambda: OpenRouterBrain(client, mdl),
+        sessions = Sessions(opts, key, lambda: OpenRouterBrain(client, mdl),
                             model_label=label)
-        app = build_app(link, sessions)
+        # ⛔ THE DEFAULT CONVERSATION IS STARTED EAGERLY, EVERY OTHER ONE
+        # LAZILY. Every conversation spawns its own server now, on first use -
+        # `Sessions.get` - and the interface used to open ONE connection at
+        # boot just to prove the server starts and to report its tool count.
+        # Asking for `default` here reproduces exactly that boot experience:
+        # it is the conversation almost every install actually opens first,
+        # and its connection is real rather than a throwaway diagnostic one.
+        default = await sessions.get(DEFAULT_CHAT_ID)
+        click.echo("server   connected, %d tools" % len(default.link.tools))
+        click.echo("open     http://%s:%d" % (host, port))
+        app = build_app(default.link, sessions)
         server = uvicorn.Server(uvicorn.Config(app, host=host, port=port,
                                                log_level="warning"))
         try:
             await server.serve()
         finally:
-            await link.close()
+            await sessions.close_all()
 
     try:
         asyncio.run(serve())

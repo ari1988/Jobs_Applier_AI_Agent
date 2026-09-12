@@ -1,12 +1,30 @@
-"""MCP server exposing browser_* tools over stealth sessions.
+"""MCP server exposing two stealth browsers, `main` and `support`.
 
-Tool names mirror the Microsoft Playwright MCP so prompts stay portable.
-Config comes from STEALTHFOX_* env vars; a session starts lazily on first use.
+⛔ THERE IS NO SESSION CONCEPT HERE, AND THAT IS DELIBERATE - not an omission,
+and not the same claim this file made a day earlier when a session held up to
+eight named browsers. This process serves exactly ONE piece of work: the two
+fixed browsers above, and nothing a tool can enumerate, name or reach a SECOND
+one of. `AIHAWK_SESSION_ID`, read once from the environment near the top of
+this file, decides which saved file that one piece of work persists to - set
+by whoever spawns this process, never by a tool argument, never published in
+a schema, never something a model can read or pass. A model working through
+this server cannot ask "what else is there" because there is no "else" to ask
+about.
+
+Tool names mirror the Microsoft Playwright MCP so prompts stay portable, with
+one deliberate departure: there are no tab tools. A browser here drives ONE
+page. Playwright's MCP offers `browser_tab_*` and this server briefly did too;
+they were removed because the case they serve is better served by `support` -
+a second tab carries the identity's cookies and fingerprint to the second
+site, which is the one thing the two browsers exist to keep apart.
+
+Config comes from STEALTHFOX_* env vars. `browser_open` starts a browser lazily
+if nothing has, exactly as before.
 
 Every tool here is a wrapper. The operations live in `actions.py` and the
-sessions live in `registry.py`, so every client drives the browser through
-exactly the same code rather than through a second implementation that would
-drift from this one.
+browsers live in `registry.py`, so every client drives them through exactly
+the same code rather than through a second implementation that would drift
+from this one.
 
 Transport is stdio by default, which is what existing clients expect. Set
 STEALTHFOX_MCP_TRANSPORT=http to serve over streamable HTTP instead, which is
@@ -27,27 +45,28 @@ import asyncio
 import atexit
 import os
 from contextlib import asynccontextmanager
+from typing import Literal
 
 from mcp.server.fastmcp import FastMCP, Image
 
 from . import NOTHING_RUNNING, actions, identity, plan, store
-from .registry import DEFAULT_SESSION_ID, SessionRegistry
+from .registry import BrowserRegistry
 
 # Kept for callers that imported it from here. The implementation moved.
 _json_capped = actions.json_capped
 
-def new_registry(**kwargs) -> SessionRegistry:
+def new_registry(**kwargs) -> BrowserRegistry:
     """A registry wired to write its sessions down.
 
     ⛔ ONE CONSTRUCTOR, USED BY THE SERVER AND BY THE TESTS. A test that builds
-    a bare `SessionRegistry` is testing a registry the product does not have,
+    a bare `BrowserRegistry` is testing a registry the product does not have,
     and the wiring below - the thing that makes a session survive the process -
     would be exercised by nothing. It is a function rather than a line because
     the tests need to build one with a factory that launches no browser, and
     the alternative was each of them repeating the wiring or, more likely, not.
     """
-    reg = SessionRegistry(**kwargs)
-    reg.on_change = lambda key: remember(key.split("/")[0])
+    reg = BrowserRegistry(**kwargs)
+    reg.on_change = lambda key: remember()
     return reg
 
 
@@ -148,7 +167,31 @@ You do not need script to read state back, either. The snapshot carries
 
 If you get to the bottom of the ladder and still cannot do the thing, say so in
 your answer. A task reported as impossible is worth more than a task completed
-in a way that gets the session blocked."""
+in a way that gets you blocked.
+
+There are two browsers, and every tool takes `browser`.
+
+`main` is your own identity: its page, its cookies, its logins, its
+fingerprint. That is where the work happens, and it is where a command goes
+when it says nothing.
+
+`support` is a helper for anything that must NOT touch that identity. The case
+it exists for: you are signing up somewhere and need a mailbox for the
+verification, so you open `support`, go to a throwaway-mail site there, take the
+address, type it into the form in `main`, and come back to `support` for the
+link. A second page inside `main` would carry the same cookies and the same
+fingerprint to both sites, and then the account and the mailbox are one person
+to anyone looking.
+
+Each browser drives ONE page, and there is no way to open, list, choose or
+close another: browser_navigate opens the page and every other tool acts on
+it. When you need a second page, that is what `support` is. Going somewhere
+else and coming back is a navigation, not a second window.
+
+Open it with browser_open when you need it and close it with browser_close when
+you are done: it costs a real browser, it is not saved, and it goes away when
+this server does. There is no third browser and no way to get one from here -
+`main` and `support` are the whole of what this gives you."""
 
 
 mcp = FastMCP("stealth", instructions=INSTRUCTIONS, lifespan=_lifespan)
@@ -159,111 +202,203 @@ mcp = FastMCP("stealth", instructions=INSTRUCTIONS, lifespan=_lifespan)
 #: they did, so both defaults exist and resolve to one browser in one session.
 DEFAULT_BROWSER_ID = "main"
 
-#: Up to eight browsers in one session, and the ceiling is a measurement rather
-#: than a taste: eight live browsers were measured at 61 processes and 6,515 MB
-#: on 2026-09-08, with the eighth taking 13.6 s to start against the first one's
-#: 6.8. The design that goes with this number is in the workbench, under
+#: The other one. See MAX_BROWSERS_PER_SESSION for why there are exactly two.
+SUPPORT_BROWSER_ID = "support"
+
+#: What a tool accepts for `browser`: a ROLE, never a name a caller invents.
+Browser = Literal["main", "support"]
+
+#: TWO browsers in one session, with fixed roles, and the number is a decision
+#: rather than a measurement - which is the opposite of what it was until
+#: 2026-09-11.
+#:
+#: It used to be eight, and the eight was measured: 61 processes and 6,515 MB,
+#: the eighth taking 13.6 s to start against the first one's 6.8. Nothing about
+#: that stopped being true. What changed is what a session MEANS. Identity lives
+#: on the browser - seed, fingerprint, profile - so a session holding eight
+#: browsers held eight identities while everything above it, the transcript and
+#: the saved state and anything a person attaches to a session, was addressed
+#: to one. "Whose is this?" had two possible answers and no way to choose.
+#:
+#: So a session is ONE identity, `main`, plus ONE helper beside it, `support`,
+#: for the things that must not touch that identity: a temporary mailbox to
+#: receive a verification, a lookup, a second opinion on a page. It is a
+#: browser and not a tab because a tab would share cookies and fingerprint with
+#: the site the identity is being built on, and the whole point of the helper
+#: is that it does not. The helper is not saved and not restored - it dies with
+#: the process - because a helper that survives IS a second identity, which is
+#: the thing this number exists to rule out.
+#:
+#: The roles are NAMES A CALLER CANNOT INVENT. `browser` on every tool is a
+#: closed choice, `main` or `support`, so nothing here ever holds a browser
+#: called `b3` or `walmart-jobs` again. Everything that handled several - the
+#: addressing, the registry keys - is still here and still correct, doing the
+#: same job for two that it did for eight. The design that went with the eight
+#: is in the workbench, under
 #: `docs_research/chat-ui-performance/30-PROGETTO-sessioni-e-otto-browser.md`.
-MAX_BROWSERS_PER_SESSION = 8
+MAX_BROWSERS_PER_SESSION = 2
 
 
-#: Which browser a session's unaddressed commands land on. A session with one
-#: browser never touches this; a session with several needs somewhere to say
-#: "this one for now", or every call would have to repeat the id and the first
-#: one forgotten would act on a browser nobody meant.
-_focus: dict = {}
+# ⛔ `_focus` STOOD HERE, an empty dict kept alive because the tests
+# patched it. Nothing in the product had written to it since `browser_focus`
+# was removed: with two fixed roles there is nothing to remember, because a
+# command is about `main` unless it says `support`. State the product does
+# not use, kept so a fixture can reset it, is the fixture holding the
+# product's shape - so it is gone from both.
 
 
-def in_session(session_id: str | None = None) -> str:
-    """The session a caller means, with whatever was saved of it read back in.
 
-    ⛔ TWO DUPLICATIONS COLLAPSED INTO ONE FUNCTION, AND THE SECOND ONE WAS A
-    DEFECT. Every entry point wrote `session_id or DEFAULT_SESSION_ID`, and
-    exactly one of them - `browsers_in` - also read the saved session first. So
-    a server that had just restarted gave back the right browsers to a client
-    that asked what the session HELD, and a brand new stranger to one that
-    simply navigated, which is what every existing client does. Nothing raised:
-    the browser worked, it was just somebody else, in a session whose real
-    identities sat unread on disk.
+#: ⛔ WHERE THIS PROCESS'S OWN PIECE OF WORK COMES FROM, AND THE ONLY PLACE
+#: THAT KNOWS IT EXISTS. Read from the environment ONCE, exactly like
+#: `STEALTHFOX_SEED` or `STEALTHFOX_PROXY` in `plan.py` - never a tool
+#: argument, never a name in a published schema, never something a model can
+#: read, pass, list or invent. There is exactly one of these for the life of
+#: the process, and nothing below can ask about, name, or reach a second one.
+#:
+#: Whoever spawns this process decides the value. The interface spawns one
+#: server PER CONVERSATION and sets this to that conversation's own id, so two
+#: conversations are two PROCESSES, each with its own saved browser on disk -
+#: the join between "which conversation" and "which browsers it opened" is now
+#: which process is running, not an argument any tool reads. A standalone
+#: client (`uvx aihawk`, or this module run directly) never sets it and lands
+#: on the same name every caller landed on before this had a name at all:
+#: `DEFAULT_SESSION_ID`.
+#:
+#: The file on disk is unaffected: `store.save`/`load`/`erase` still take a
+#: plain string and still write `sessions/<that string>.json`, exactly as
+#: before. A file saved by an earlier build is found under the same name it
+#: was saved under; nothing here migrates it.
+_SESSION_ID = os.environ.get("AIHAWK_SESSION_ID") or store.DEFAULT_SESSION_ID
 
-    Reading is idempotent and guarded by `_loaded`, so putting it here costs a
-    set lookup on the calls that have already read theirs.
+#: Whether the saved browser has been read into the registry yet. A single
+#: flag and not a set keyed by id, because this process holds the one piece of
+#: work named above and there is only ever one thing to restore.
+_restored = False
+
+
+def restore() -> bool:
+    """Read the saved browser back, if there is one and it has not been read
+    yet.
+
+    Declares it rather than starting it: the identity comes back immediately
+    and costs nothing, and the engine comes back when something is actually
+    aimed at it. Answers whether anything was read.
     """
-    at_session = session_id or DEFAULT_SESSION_ID
-    restore(at_session)
-    return at_session
+    global _restored
+    if _restored:
+        return False
+    _restored = True
+    saved = store.load(_SESSION_ID)
+    if not saved:
+        return False
+    held = saved.get("browsers") or {}
+    if held:
+        # ⛔ A FILE WRITTEN BY AN OLDER BUILD CAN NAME EIGHT BROWSERS AND CALL
+        # THEM ANYTHING, and this is the only door left that either can come
+        # through: nothing in this process makes a browser outside the two
+        # roles any more. A file saved by 0.38.0 with ten browsers called
+        # `b-tech` and `walmart-jobs` would otherwise restore all ten under
+        # those names.
+        #
+        # What comes back is ONE browser, as `main`: the one the file says was
+        # in focus, because that is the browser the person left in front of
+        # them, else the first by name. The rest are dropped from this
+        # PROCESS and not deleted from the file - nothing here rewrites it
+        # until it changes, and a build that gets rolled back should find
+        # what it left. A saved `support` cannot exist from this build and is
+        # not restored from an older one either: the helper is not an
+        # identity.
+        keep = saved.get("focus") if saved.get("focus") in held else None
+        keep = keep or sorted(held)[0]
+        held = {DEFAULT_BROWSER_ID: held[keep]}
+    for name, config in held.items():
+        key = "%s/%s" % (_SESSION_ID, name)
+        # The identity is DECLARED - the browser does not start - and the tabs
+        # are OWED, to be reopened by the wake that starts it. Kept apart from
+        # the identity on purpose: `declare` writes the launch settings, and a
+        # list of urls is not one of them. Handing them to the registry would
+        # make it carry a fact about pages, which is the one thing it has
+        # deliberately never known.
+        owed = config.pop("urls", None)
+        # ⛔ AND THE ENGINE COMES FROM THIS PROCESS, NOT FROM THE FILE. The file
+        # deliberately does not carry `binary_path` - it is a path on this
+        # machine, and a process started on another one must resolve an engine
+        # rather than insist on one that is not there. Leaving it out of the
+        # file was read as leaving it out of the BROWSER, so a restored browser
+        # came back without the engine the person had named on the command
+        # line: on a locally built one, with nothing to download, it could not
+        # start at all. What the file says is who this browser is; what this
+        # build was asked to run it on is not the file's to say.
+        registry.declare(key, dict(config, **plan.engine_here()))
+        if owed:
+            _tabs_owed[key] = list(owed)
+    return True
 
 
-def focused(session_id: str | None = None) -> str:
-    """The browser this session's unaddressed commands go to."""
-    return _focus.get(in_session(session_id), DEFAULT_BROWSER_ID)
+def focused() -> str:
+    """The browser a command that names none is about: always `main`.
+
+    Still a function, because every caller went through it while it could
+    answer several things, and it still triggers the one-time restore - that
+    is where a saved browser is read back in, and callers rely on the side
+    effect.
+    """
+    restore()
+    return DEFAULT_BROWSER_ID
 
 
-#: The launch settings that say WHO a browser is, and so the ones a saved
-#: session carries. Everything else in the launch kwargs describes the machine
-#: it ran on, and writing those down would restore a session onto the wrong one.
+#: The launch settings that say WHO a browser is, and so the ones a saved file
+#: carries. Everything else in the launch kwargs describes the machine it ran
+#: on, and writing those down would restore a browser onto the wrong one.
 #:
 #: ⛔ THESE ARE THE LAUNCH KWARGS' OWN NAMES, NOT THE TOOL ARGUMENTS' NAMES, and
 #: the difference is not cosmetic. This list said `profile` for its first day,
-#: which is what `browser_open` and `session_start` call it; the launch kwarg is
-#: `profile_dir`, so the filter matched nothing and the profile was the one
-#: field never saved - the one field that carries the cookies and the logins a
-#: reopened session is FOR. Nothing failed: every browser came back with the
-#: right seed and the right exit, logged out.
+#: which is what `browser_open` calls it; the launch kwarg is `profile_dir`, so
+#: the filter matched nothing and the profile was the one field never saved -
+#: the one field that carries the cookies and the logins a reopened browser is
+#: FOR. Nothing failed: every browser came back with the right seed and the
+#: right exit, logged out.
 #:
 #: `binary_path` is deliberately absent. It is a path on this machine, and a
-#: session reopened where that path means nothing must resolve an engine rather
-#: than insist on one that is not there.
+#: browser reopened where that path means nothing must resolve an engine
+#: rather than insist on one that is not there.
 WHO_A_BROWSER_IS = ("seed", "proxy", "profile_dir", "headless")
 
-#: Sessions whose saved file has already been read into the registry. Loading
-#: is idempotent but not free, and a session that was loaded and then had a
-#: browser closed must not be re-loaded back into having it.
-_loaded: set = set()
 
-
-def browsers_in(session_id: str | None = None) -> list:
-    """The browsers this session has, by id, running or only declared.
+def browsers_in() -> list:
+    """The browsers here, by id, running or only declared.
 
     Read from the registry's own memory rather than from a list kept beside it,
     because a second list is a second truth: a browser dropped by a failed retry
     would still be in it, and the ceiling would refuse a slot that is free.
 
-    Declared counts. A browser restored from a saved session has not started
-    yet - it starts when something is aimed at it - but it holds a slot and it
-    is one of the session's browsers, so it is one here too.
+    Declared counts. A browser restored from a saved file has not started yet -
+    it starts when something is aimed at it - but it holds a slot and it is one
+    of the two here too.
     """
-    at_session = in_session(session_id)
-    prefix = "%s/" % at_session
+    restore()
+    prefix = "%s/" % _SESSION_ID
     return sorted(k[len(prefix):] for k in registry.declared()
                   if k.startswith(prefix))
 
 
-def remember(session_id: str | None = None) -> None:
-    """Write this session down as it stands now.
+def remember() -> None:
+    """Write the browsers held here down, as they stand now.
 
-    Called after anything that changes what the session HOLDS rather than on a
-    timer, so the file on disk is never a version of the session that existed
-    only between two ticks. Two kinds of caller, and they cover different halves:
+    Called after anything that changes what is HELD rather than on a timer, so
+    the file on disk is never a version that existed only between two ticks.
+    Hooked into the REGISTRY, through `new_registry`, whenever a browser gains
+    or loses an identity - that is every way one comes to exist, including the
+    lazy auto-start a caller that never calls `browser_open` uses.
 
-    * the REGISTRY, through `new_registry`, whenever a browser gains or loses an
-      identity. That is every way a browser comes to exist, including the lazy
-      auto-start that clients which never call `browser_open` use, which is why
-      it is hooked there rather than listed here;
-    * the TOOLS, when the FOCUS moves. The registry cannot see that - the focus
-      is which browser unaddressed commands mean, and it lives in this module -
-      and it has to be written after the move, which is also why the tools call
-      this again after an open or a close rather than leaving it to the hook.
-
-    ⛔ A WRITE THAT FAILS COSTS THE SAVED SESSION AND NOTHING ELSE. By the time
-    this runs the browser is already built and correct, so a full disk or a home
-    directory somebody made read-only must not turn a working `browser_open`
-    into an error. Guarded here rather than at the call sites because this is
-    the only function that writes: a guard at the callers would be one per
-    caller, and the next caller would be the one without it.
+    ⛔ A WRITE THAT FAILS COSTS THE SAVED FILE AND NOTHING ELSE. By the time
+    this runs the browser is already built and correct, so a full disk or a
+    home directory somebody made read-only must not turn a working
+    `browser_open` into an error. Guarded here rather than at the call sites
+    because this is the only function that writes: a guard at the callers
+    would be one per caller, and the next caller would be the one without it.
     """
-    at_session = session_id or DEFAULT_SESSION_ID
-    prefix = "%s/" % at_session
+    prefix = "%s/" % _SESSION_ID
     browsers = {}
     for key in registry.declared():
         if not key.startswith(prefix):
@@ -278,73 +413,40 @@ def remember(session_id: str | None = None) -> None:
         been = _seen_tabs.get(key)
         if been:
             wrote["urls"] = been
-        browsers[key[len(prefix):]] = wrote
+        name = key[len(prefix):]
+        if name == SUPPORT_BROWSER_ID:
+            # ⛔ THE HELPER IS NOT WRITTEN DOWN. A support browser that comes
+            # back after a restart is a second identity, which is exactly what
+            # having two fixed roles exists to rule out. It lives for the task
+            # and dies with the process.
+            continue
+        browsers[name] = wrote
     try:
         if not browsers:
-            store.erase(at_session)
+            store.erase(_SESSION_ID)
             return
-        store.save(at_session, browsers, focus=_focus.get(at_session))
+        store.save(_SESSION_ID, browsers, focus=DEFAULT_BROWSER_ID)
     except Exception:
         pass
 
 
-def restore(session_id: str | None = None) -> bool:
-    """Read a saved session back, if there is one and it has not been read yet.
+def addressed(browser_id: str | None = None) -> str:
+    """The registry key for one of the two browsers here.
 
-    Declares its browsers rather than starting them: the identities come back
-    immediately and cost nothing, and the engines come back one at a time, when
-    something is actually aimed at one. Answers whether anything was read.
-    """
-    at_session = session_id or DEFAULT_SESSION_ID
-    if at_session in _loaded:
-        return False
-    _loaded.add(at_session)
-    saved = store.load(at_session)
-    if not saved:
-        return False
-    for name, config in (saved.get("browsers") or {}).items():
-        key = "%s/%s" % (at_session, name)
-        # The identity is DECLARED - the browser does not start - and the tabs
-        # are OWED, to be reopened by the wake that starts it. Kept apart from
-        # the identity on purpose: `declare` writes the launch settings, and a
-        # list of urls is not one of them. Handing them to the registry would
-        # make it carry a fact about pages, which is the one thing it has
-        # deliberately never known.
-        owed = config.pop("urls", None)
-        # ⛔ AND THE ENGINE COMES FROM THIS PROCESS, NOT FROM THE FILE. The file
-        # deliberately does not carry `binary_path` - it is a path on this
-        # machine, and a session opened on another one must resolve an engine
-        # rather than insist on one that is not there. Leaving it out of the
-        # file was read as leaving it out of the BROWSER, so a restored browser
-        # came back without the engine the person had named on the command
-        # line: on a locally built one, with nothing to download, it could not
-        # start at all. What the file says is who this browser is; what this
-        # build was asked to run it on is not the file's to say.
-        registry.declare(key, dict(config, **plan.engine_here()))
-        if owed:
-            _tabs_owed[key] = list(owed)
-    if saved.get("focus"):
-        _focus[at_session] = saved["focus"]
-    return True
-
-
-def addressed(session_id: str | None = None, browser_id: str | None = None) -> str:
-    """The registry key for one browser inside one session.
-
-    ⛔ The registry stores browsers by string key and knows nothing about
-    sessions, and that is deliberate: everything it already gets right - one
-    lock per key so two callers racing start one browser rather than two, the
-    configuration remembered so a rebuild is the SAME PERSON with the same seed
-    and the same exit, tab numbering that does not restart across a rebuild -
-    starts working per BROWSER the moment the key names one. Composing here buys
-    all of it without touching a line of it.
+    ⛔ The registry stores browsers by string key and knows nothing about what
+    the key means, and that is deliberate: everything it already gets right -
+    one lock per key so two callers racing start one browser rather than two,
+    the configuration remembered so a rebuild is the SAME PERSON with the same
+    seed and the same exit, tab numbering that does not restart across a
+    rebuild - starts working per BROWSER the moment the key names one.
+    Composing here buys all of it without touching a line of it.
 
     Everything in this module addresses through this function. A single call
     that still reaches for the bare default would look at one browser while its
     neighbours wrote to another, and nothing would raise.
     """
-    at_session = in_session(session_id)
-    return "%s/%s" % (at_session, browser_id or focused(at_session))
+    restore()
+    return "%s/%s" % (_SESSION_ID, browser_id or DEFAULT_BROWSER_ID)
 
 
 #: Where each browser's tabs were, by composed key. Written whenever a browser
@@ -380,10 +482,10 @@ def _note_tabs(key: str, urls) -> None:
     if _seen_tabs.get(key) == fresh:
         return
     _seen_tabs[key] = fresh
-    remember(key.split("/")[0])
+    remember()
 
 
-async def ready(session_id=None, browser_id=None):
+async def ready(browser_id=None):
     """This browser, started, and back where it was.
 
     ⛔ ONE FUNNEL, AND THAT IS THE WHOLE POINT OF IT EXISTING. Every tool used to
@@ -395,23 +497,32 @@ async def ready(session_id=None, browser_id=None):
     that came home empty. The rule this follows is the project's: after the fix,
     the places that know a thing are one.
 
-    Reopening happens ONCE per browser and only for tabs a SAVED session
-    declared. A browser that has been woken owns its own tabs, and a wake that
-    kept reopening them would fight whoever is using it.
+    Reopening happens ONCE per browser and only for a page a SAVED file
+    declared. A browser that has been woken owns where it goes next, and a wake
+    that kept reopening would fight whoever is using it.
+
+    ⛔ ONE PAGE, WHICH IS WHAT MAKES THE REST OF THIS SURFACE TRUE. This loop
+    used to reopen every url the file held, one `new_page` each - so a saved
+    file was the one input that could put a browser into a state the
+    instructions call impossible ("there is no way to open, list, choose or
+    close another"), with no tool left to inspect or close the extras. It also
+    made `browser_status` blame the site for pages this function had opened.
+    The file still records every url it saw, because that is an observation
+    and a browser can legitimately hold several; what is restored is the one
+    the browser was ON, which is the LAST of them - the same page the old loop
+    left active, since every `new_page` moved the active one along.
     """
-    at = addressed(session_id, browser_id)
+    at = addressed(browser_id)
     owed = _tabs_owed.pop(at, None)
     session = await registry.ensure(at)
     if owed:
         try:
-            for url in owed:
-                await session.new_page()
-                await actions.navigate(session, url)
+            await session.new_page()
+            await actions.navigate(session, owed[-1])
         except Exception:
             # A url that will not load must not cost the browser. It is up, it
-            # is the right person, and the tab it could not reopen is one tab -
-            # refusing to hand it back would turn a stale bookmark into a
-            # session somebody cannot use.
+            # is the right person, and refusing to hand it back would turn a
+            # stale bookmark into a session somebody cannot use.
             pass
     try:
         # The urls only. `describe_pages` also fetches each tab's TITLE, which
@@ -423,13 +534,13 @@ async def ready(session_id=None, browser_id=None):
     return session
 
 
-def looking(session_id=None, browser_id=None):
+def looking(browser_id=None):
     """This browser only if it is ALREADY running. Never starts one.
 
     ⛔ A QUESTION IS NOT A COMMAND, AND `ready` CANNOT TELL THEM APART, because
     it starts whatever it resolves. That is exactly right for an instruction
     and exactly wrong for a look, and the difference is measurable: on 0.38.0,
-    drawing the live panes of a session nobody had asked anything took the
+    drawing the live panes of a conversation nobody had asked anything took the
     machine from 9 firefox processes to 16, roughly 800 MB and seven seconds,
     and `browser_watch` then answered an error - so the engine the look had
     started was not even used for the look.
@@ -445,24 +556,24 @@ def looking(session_id=None, browser_id=None):
     still starts it as the same person, through `ready`. Only looking stopped
     waking it.
     """
-    return registry.peek(addressed(session_id, browser_id))
+    return registry.peek(addressed(browser_id))
 
 
-async def _retrying(fn, *args, session_id=None, browser_id=None, **kwargs):
+async def _retrying(fn, *args, browser_id=None, **kwargs):
     """Run an action on one browser, and on failure rebuild it once and retry.
 
     A browser that died between two calls is the ordinary case here, not an
     exotic one: the object is still intact, so the failure surfaces inside the
-    action rather than when the session was handed out.
+    action rather than when it was handed out.
 
     The rebuild is addressed too. Dropping and re-ensuring the DEFAULT key while
-    the action was aimed at another browser would kill a browser nobody asked
+    the action was aimed at the other browser would kill a browser nobody asked
     about and hand back the wrong one, which is the same class of mistake as
     rebuilding from the environment: it succeeds, and it succeeds at the wrong
     thing.
     """
-    at = addressed(session_id, browser_id)
-    session = await ready(session_id, browser_id)
+    at = addressed(browser_id)
+    session = await ready(browser_id)
     try:
         return await fn(session, *args, **kwargs)
     except Exception:
@@ -477,190 +588,187 @@ async def _retrying(fn, *args, session_id=None, browser_id=None, **kwargs):
         if been:
             _tabs_owed[at] = list(been)
         await registry.drop(at)
-        session = await ready(session_id, browser_id)
+        session = await ready(browser_id)
         return await fn(session, *args, **kwargs)
 
 
-# --- the sessions themselves -----------------------------------------------
+# --- the two browsers -------------------------------------------------------
 
 @mcp.tool()
-async def session_list() -> str:
-    """The saved sessions, and what each one holds.
+async def browser_open(browser: Browser | None = None, seed: int | None = None,
+                       proxy: str | None = None, profile: str | None = None) -> str:
+    """Open `main` or `support`, or reopen one as somebody else.
 
-    A session is the piece of work: it owns browsers, and each browser owns its
-    own tabs, cookies and identity. They survive the server, so this is how you
-    find the one you were in.
+    `main` is your own identity - its page, cookies, fingerprint, the logins - and
+    `support` is a helper beside it for what must not touch that identity: a
+    temporary mailbox to receive a verification, a lookup, a page you want to
+    read without the site connecting it to the account. They share nothing.
+    The helper is not saved: it lives for the task and dies with this server.
 
-    Starts nothing, and opens no browser: a saved browser is a declaration of
-    who it will be, and it comes back when something is aimed at it.
+    Called on a browser that is already up, this REOPENS it with the settings
+    given, and what it held is gone - so this is also how you become somebody
+    else: a fresh stranger, the same person as last time by seed, or a saved
+    profile that is already logged in somewhere.
+
+    seed     the browser's identity. Same seed, same fingerprint, every time.
+             Leave it out and one is drawn, and the answer tells you which, so
+             you can ask for it again later.
+    profile  a directory that keeps cookies and logins between opens. A
+             profile also KEEPS ITS SEED: the first open on a new one stores
+             the identity inside it, and every open after reuses it, so a
+             login does not come back wearing different hardware. Pass "" to
+             insist on no profile at all. A relative path is resolved against
+             the server's own directory, so the answer reports the full path
+             used.
+    proxy    where the traffic goes out, as `http://user:pass@host:port` or
+             `socks5://host:port`. Pass "" to insist on going out from this
+             machine's own address. Left out for `support`, it goes out
+             through the same exit `main` already has; give it a value only
+             if you mean `support` to look different. A profile does NOT pin
+             its exit the way it pins its seed: timezone, locale and
+             geography come from the exit, so the same login arriving from
+             another country is as visible as one arriving on different
+             hardware.
+
+    Opening one takes several seconds and costs real memory. browser_close
+    frees it.
     """
-    saved = store.known()
-    if not saved:
-        return ("no saved sessions yet. Any session that opens a browser is "
-                "saved from that moment, and session_list finds it again.")
-    rows = []
-    for s in saved:
-        names = sorted((s.get("browsers") or {}))
-        rows.append("%s (%s): %s%s" % (
-            s.get("name") or s["id"], s["id"],
-            ", ".join(names) if names else "no browsers",
-            ", saved %s" % s["saved"] if s.get("saved") else ""))
-    return "%d saved session(s). %s" % (len(saved), " | ".join(rows))
+    role = browser or DEFAULT_BROWSER_ID
 
+    if role not in (DEFAULT_BROWSER_ID, SUPPORT_BROWSER_ID):
+        # ⛔ THE SCHEMA ALREADY REFUSES THIS AND THIS STILL REFUSES IT. `browser`
+        # is a Literal, so a model that invents a name is turned back by the
+        # protocol before it reaches here - but the schema is not the only door:
+        # the interface and the tests call these functions directly, and a
+        # third browser called `b3` is the thing two fixed roles exist to rule
+        # out.
+        return ("there are two browsers here: `main`, your own identity, and "
+                "`support`, the helper beside it. There is no %r." % role)
 
-@mcp.tool()
-async def session_forget(session_id: str) -> str:
-    """Delete a saved session: its browsers are closed and it stops being listed.
+    try:
+        chosen = plan.plan_session(seed=seed, proxy=proxy, profile=profile)
+    except (identity.IdentityConflict, ValueError) as exc:
+        # Refused, not guessed. Every case here is one where continuing would
+        # hand the caller a different person than the one they asked for, and
+        # whatever is already running is deliberately left alone: a refusal
+        # must not cost somebody the browser they already had.
+        return "refused: %s" % exc
+    settings = chosen.kwargs
 
-    This is not the same as closing browsers. Closing frees the engines and
-    keeps the session; this removes the session itself, so nothing about it
-    comes back.
-    """
-    restore(session_id)
-    # ⛔ ASKED BEFORE ANYTHING IS CLOSED, and the order is the whole bug. Closing
-    # the last browser makes the registry report the change, which writes the
-    # session down, which - having no browsers left - ERASES the file. So by the
-    # time the erase below runs there is nothing left to erase, and reading the
-    # answer of that erase told the caller that a session it had just deleted
-    # had never existed. The deletion was always right; the sentence was not,
-    # and a model that reads "there is no saved session called X" concludes the
-    # name it used was wrong and goes looking for another one.
-    existed = store.load(session_id) is not None or bool(browsers_in(session_id))
-    for name in browsers_in(session_id):
-        await registry.forget(addressed(session_id, name))
-    _focus.pop(session_id, None)
-    store.erase(session_id)
-    return ("session %s is gone." % session_id if existed
-            else "there is no saved session called %s." % session_id)
-
-
-# --- the browsers a session holds ------------------------------------------
-
-@mcp.tool()
-async def browser_open(browser_id: str | None = None, seed: int | None = None,
-                       proxy: str | None = None, profile: str | None = None,
-                       session_id: str | None = None) -> str:
-    """Open ANOTHER browser in this session, and make it the one commands go to.
-
-    A session can hold several browsers at once, each with its own tabs, its own
-    cookies and its own identity: one for the dashboard, one for the docs, one
-    logged in as somebody else. They do not share anything, so work in one
-    cannot disturb another.
-
-    Give `browser_id` a name you will recognise, or let one be chosen. `seed`,
-    `proxy` and `profile` decide who this browser is, exactly as in
-    session_start, and they apply to this browser alone.
-
-    Opening one takes several seconds and costs real memory, so open what you
-    need and close what you stop using: browser_close frees it.
-    """
-    at_session = in_session(session_id)
-    have = browsers_in(at_session)
-
-    if browser_id is None:
-        # Never a name already in use, and never one that was in use earlier in
-        # this session: reusing it would hand somebody a browser they think they
-        # opened and somebody else thinks they still hold.
-        n = 1
-        while ("b%d" % n) in have:
-            n += 1
-        browser_id = "b%d" % n
-    elif browser_id in have:
-        return ("session %s already has a browser called %s. Use it by naming "
-                "it, or close it first." % (at_session, browser_id))
-
-    if len(have) >= MAX_BROWSERS_PER_SESSION:
-        # The ceiling says what it costs, because a refusal that only says "no"
-        # invites the reader to raise the number.
-        return ("session %s already holds %d browsers, which is the limit. "
-                "Eight live browsers were measured at 61 processes and about "
-                "6.5 GB, with the eighth taking twice as long to start as the "
-                "first, so the ceiling is a real cost and not a formality. "
-                "Close one with browser_close before opening another. Open "
-                "now: %s." % (at_session, len(have), ", ".join(have)))
-
-    at = addressed(at_session, browser_id)
-    settings = plan.plan_session(seed=seed, proxy=proxy, profile=profile).kwargs
+    at = addressed(role)
+    main_config = registry.config(addressed())
+    if role == SUPPORT_BROWSER_ID and proxy is None and main_config is not None:
+        # ⛔ THE HELPER INHERITS THE EXIT, BY DEFAULT AND ON PURPOSE. A helper
+        # that came out through a different address than the identity it helps
+        # would be the one thing on the wire saying "these two are not the same
+        # person, and yet they work together". Its FINGERPRINT is its own - a
+        # fresh seed unless given - because the two must not read as one browser
+        # either. Same exit, different person: a colleague at the next desk.
+        #
+        # Copied AFTER planning and as the resolved dict, not passed in as a
+        # url: the plan takes a url and `main` holds the dict it was launched
+        # with, and re-deriving one from the other is a second reader of the
+        # same fact. And it copies the ABSENCE too: a `main` that goes out
+        # direct has no `proxy` key, so the helper goes out direct as well,
+        # rather than picking up an environment proxy `main` never used. Only
+        # when `main` has not been declared at all is the environment left to
+        # decide, which is what `main` itself will do when it starts.
+        settings.pop("proxy", None)
+        if main_config.get("proxy"):
+            settings["proxy"] = main_config["proxy"]
     try:
         await registry.restart(at, **settings)
     except Exception as exc:
-        return "browser %s could not start: %s" % (browser_id, exc)
+        # ⛔ Said plainly, because the dangerous reading is "that failed, carry
+        # on". Nothing is running there now, and every later tool will repeat
+        # this refusal rather than quietly starting a browser without the exit
+        # that was asked for.
+        return ("the %s browser did NOT start: %s\n"
+                "Nothing is browsing there, and the tools will keep failing "
+                "until browser_open succeeds. A proxy that is down is the "
+                "usual cause; try another exit, or pass proxy=\"\" to go out "
+                "from this machine knowing that is what you are doing."
+                % (role, exc))
 
-    _focus[at_session] = browser_id
-    remember(at_session)
-    return ("browser %s is open in session %s and is now the one unaddressed "
-            "commands go to. %s" % (browser_id, at_session,
-                                    plan.describe(registry.config(at) or {})))
+    remember()
+    return "the %s browser is open. %s" % (role, plan.describe(registry.config(at) or {}))
 
 
 @mcp.tool()
-async def browser_close(browser_id: str | None = None,
-                        session_id: str | None = None) -> str:
-    """Close one browser of this session and free what it was holding.
+async def browser_close(browser: Browser | None = None) -> str:
+    """Close one browser and free what it was holding.
 
-    The tabs it had are gone with it. The other browsers in the session are not
-    touched, and neither is the conversation.
+    The page it had is gone with it. The other browser is not touched.
 
-    Closing FORGETS who that browser was: a later browser opened under the same
-    name is a new stranger, not the same person resumed. That is deliberate -
-    a browser somebody shut down should not come back wearing its old identity.
+    Closing FORGETS who that browser was: opening it again is a new stranger,
+    not the same person resumed. That is deliberate - a browser somebody shut
+    down should not come back wearing its old identity.
     """
-    at_session = in_session(session_id)
-    name = browser_id or focused(at_session)
-    existed = await registry.forget(addressed(at_session, name))
+    name = browser or DEFAULT_BROWSER_ID
+    existed = await registry.forget(addressed(name))
 
-    if _focus.get(at_session) == name:
-        _focus.pop(at_session, None)
-    left = browsers_in(at_session)
-    remember(at_session)
+    left = browsers_in()
+    remember()
     if not existed:
-        return "session %s has no browser called %s." % (at_session, name)
-    return ("browser %s is closed. Still open in session %s: %s."
-            % (name, at_session, ", ".join(left) if left else "none"))
+        return "the %s browser is not open." % name
+    return ("the %s browser is closed. Still open: %s."
+            % (name, ", ".join(left) if left else "none"))
 
 
 @mcp.tool()
-async def browser_list(session_id: str | None = None) -> str:
-    """Which browsers this session holds, where each one is, and which one the
-    commands that name none go to.
+async def browser_list() -> str:
+    """Which of the two browsers are open, where each one is, and which one
+    the commands that name none go to.
 
-    Answers JSON: `session`, `focus`, `limit`, `note`, and `browsers` - each with
-    `id`, `running`, `focused` and the `urls` of its tabs. A browser that is not
-    running is one this session declared and has not needed yet; the next
+    Answers JSON: `focus`, `limit`, `note`, and `browsers` - each with `id`,
+    `running`, `focused`, `url` (the page it is on) and `urls` (every page it
+    holds, which is more than one only when a site opened one). A browser that
+    is not running has been declared and has not been needed yet; the next
     command aimed at it starts it as the same person.
 
     Starts nothing: it reports what is running, so asking is free.
     """
-    at_session = in_session(session_id)
-    have = browsers_in(at_session)
-    here = focused(at_session)
+    have = browsers_in()
+    here = focused()
     rows = []
     for name in have:
-        session = registry.peek(addressed(at_session, name))
-        urls, running = [], session is not None
-        if running:
+        session = registry.peek(addressed(name))
+        # `urls` is a list, or None for "running and unreadable" - the two are
+        # different answers and the pane draws them differently, which is why
+        # the type says so rather than collapsing the second into an empty list.
+        urls: list | None = []
+        here_url, running = "", session is not None
+        if session is not None:
             try:
-                urls = [p["url"] or "" for p in await session.describe_pages()]
-                _note_tabs(addressed(at_session, name), urls)
+                pages = await session.describe_pages()
+                urls = [p["url"] or "" for p in pages]
+                # ⛔ WHICH PAGE IS THE LIVE ONE, and it has to come from here
+                # now. The interface used to learn the address from the tab
+                # tool, which marked the active row; with the tab tools gone
+                # this is the only tool that still knows, and the answer the
+                # address bar needs is the ACTIVE page rather than the first -
+                # a site that opens one of its own makes those two different,
+                # and `session.page()` drives the newest live one.
+                shown = next((p for p in pages if p["active"]), pages[0] if pages else None)
+                here_url = (shown["url"] or "") if shown else ""
+                _note_tabs(addressed(name), urls)
             except Exception:
                 # Readable as a state rather than as an absence: a browser whose
-                # tabs cannot be read is not a browser with no tabs, and a pane
-                # drawing "no tabs" over a live window would be a lie.
+                # pages cannot be read is not a browser with no pages, and a pane
+                # drawing "nothing open" over a live window would be a lie.
                 running, urls = True, None
         rows.append({"id": name, "running": running, "focused": name == here,
-                     "urls": urls})
+                     "url": here_url, "urls": urls})
     # ⛔ JSON, WHERE THIS ANSWERED PROSE UNTIL 0.18.0, and the reason is the
     # stated architecture rather than taste: the interface is a client of these
     # tools like anybody else, with no privileged path, so a workspace that has
     # to draw one pane per browser needs this question answered in a shape a
     # program can read. The alternative was the page parsing a sentence, which
     # is two readers of one wire format, or a second tool saying the same thing,
-    # which is two sources for one fact. `session_list_pages` has answered JSON
-    # since 0.9.0 and models read it without trouble; `note` carries the
-    # sentence that used to be the whole answer, because "there is nothing here
-    # yet" is worth saying in words.
+    # which is two sources for one fact. Models read JSON from these tools
+    # without trouble; `note` carries the sentence that used to be the whole
+    # answer, because "there is nothing here yet" is worth saying in words.
     return actions.json_capped({
-        "session": at_session,
         "focus": here,
         "limit": MAX_BROWSERS_PER_SESSION,
         "browsers": rows,
@@ -672,205 +780,86 @@ async def browser_list(session_id: str | None = None) -> str:
     })
 
 
-@mcp.tool()
-async def browser_focus(browser_id: str, session_id: str | None = None) -> str:
-    """Choose which browser this session's unaddressed commands go to.
-
-    Every tool can still name a browser and reach it whatever the focus is; this
-    only decides where the ones that name none land, so a run of commands on one
-    browser does not have to repeat its id.
-    """
-    at_session = in_session(session_id)
-    have = browsers_in(at_session)
-    if browser_id not in have:
-        return ("session %s has no browser called %s. Open: %s."
-                % (at_session, browser_id, ", ".join(have) if have else "none"))
-    _focus[at_session] = browser_id
-    remember(at_session)
-    return "commands without a browser_id now go to %s." % browser_id
+# ⛔ `browser_focus` STOOD HERE AND IS GONE WITH THE THING IT CHOSE BETWEEN. It
+# said which of several browsers unaddressed commands land on. There are two
+# now, with fixed roles, and a command is about `main` unless it says
+# `support` - every time, on every tool. A focus would be hidden state a model
+# has to track, and the way that fails is a command meant for the identity
+# landing in the helper because the previous one did.
 
 
-# --- who is browsing -------------------------------------------------------
+# --- who is browsing ---------------------------------------------------------
 
 @mcp.tool()
-async def session_status(session_id: str | None = None,
-                         browser_id: str | None = None) -> str:
-    """Who is browsing right now: the identity, the exit, the profile and the tabs.
+async def browser_status(browser: Browser | None = None) -> str:
+    """Who is browsing right now: the identity, the exit, the profile and the page.
 
-    Ask whenever you need to know which person the browser currently is, or from
-    where its traffic leaves. The seed is what you would pass to `session_start`
-    to become this person again, so this is also how you record a session that
-    is worth repeating.
+    Ask whenever you need to know which person the browser currently is, or
+    from where its traffic leaves. The seed is what you would pass to
+    `browser_open` to become this person again, so this is also how you
+    record an identity worth repeating.
 
     It starts nothing. If no browser is running yet it says so, because until
     one is running there is no identity to report.
 
-    session_id and browser_id are optional. Leave them out and this reports the
-    default browser, as before; name them when a session holds more than one.
+    `browser` is `main` unless you say `support`, and they share nothing.
     """
-    at = addressed(session_id, browser_id)
+    at = addressed(browser)
     config = registry.config(at)
     if config is None:
-        return ("no browser is running yet, so there is no identity to report. "
-                "The next tool that needs a page will start one, or call "
-                "session_start to choose who it is.")
+        return ("no browser is running yet, so there is no identity to "
+                "report. The next tool that needs a page will start one, or "
+                "call browser_open to choose who it is.")
 
     session = registry.peek(at)
-    tabs = "no tabs open"
-    if session is not None:
+    if session is None:
+        where = "the browser is not up; the next tool restarts it as this person"
+    else:
         try:
             rows = await session.describe_pages()
-            tabs = ", ".join(
-                "%s%s %s" % (r["id"], "*" if r["active"] else "", r["url"] or "blank")
-                for r in rows) or "no tabs open"
+            here = next((r for r in rows if r["active"]), rows[0] if rows else None)
+            where = (here["url"] or "blank") if here else "no page open yet"
+            # ⛔ COUNTED, AND NOT BLAMED ON ANYBODY. A caller cannot make,
+            # choose or close a page, so the honest report of a second one is
+            # that it is there - not who opened it. The first version of this
+            # line said "the site has opened %d more", and measured on a
+            # restored browser it was false: `ready` was opening them itself,
+            # one per saved url. Fixing that left this sentence true, and it
+            # still does not say it, because a confident wrong cause is the
+            # defect this project removed from `navigate` ("navigated to
+            # {url}" whatever happened). Counted, never named: naming them
+            # would offer a vocabulary nothing here accepts.
+            if len(rows) > 1:
+                where += " (%d other pages are open in this browser)" % (len(rows) - 1)
         except Exception:
-            tabs = "tabs unreadable"
-    else:
-        tabs = "the browser is not up; the next tool restarts it as this person"
+            where = "the page is unreadable"
 
-    return plan.describe(config) + " tabs: %s." % tabs
+    return plan.describe(config) + " page: %s." % where
 
 
-@mcp.tool()
-async def session_start(seed: int | None = None, proxy: str | None = None,
-                        profile: str | None = None,
-                        session_id: str | None = None,
-                        browser_id: str | None = None) -> str:
-    """Start a browsing session as a particular person, and say who that is.
-
-    Call this when you want to control WHO is browsing: a fresh stranger, the
-    same person as last time, or a saved profile that is already logged in
-    somewhere. Calling it closes whatever browser is open and starts another,
-    so anything not saved in a profile is gone.
-
-    You do not have to call it at all. The first tool that needs a page starts a
-    session on its own; `session_status` then tells you who that turned out to
-    be.
-
-    A browser holds ONE identity, and this replaces it. Two identities in the
-    same browser are visited in turn, never at the same time, so a task that
-    needs both accounts live at once is worth saying so rather than
-    half-starting.
-
-    seed     the browser identity. Same seed, same fingerprint, every time.
-             Leave it out and one is drawn, and the answer tells you which, so
-             you can ask for it again later.
-    profile  a directory that keeps cookies and logins between sessions. A
-             profile also KEEPS ITS SEED: the first session on a new one stores
-             the identity inside it, and every session after reuses it, so a
-             login does not come back wearing different hardware. Pass "" to
-             insist on no profile at all, which is how you get sessions a site
-             cannot link to each other. A relative path is resolved against the
-             server's own directory, so the answer reports the full path it
-             used.
-    proxy    where the traffic goes out, as `http://user:pass@host:port` or
-             `socks5://host:port`. Pass "" to insist on going out from this
-             machine's own address. A profile does NOT pin its exit the way it
-             pins its seed: timezone, locale and geography come from the exit,
-             so the same login arriving from another country is as visible as
-             one arriving on different hardware. You are warned when a profile's
-             exit changes, but only when YOU change it - a provider that rotates
-             its own addresses behind one host and port looks identical here.
-
-    session_id and browser_id are optional. Leave them out and this starts the
-    default browser, as before; name them to say WHICH browser becomes this
-    person, when a session holds more than one.
-    """
-    try:
-        chosen = plan.plan_session(seed, proxy, profile, os.environ)
-    except (identity.IdentityConflict, ValueError) as exc:
-        # Refused, not guessed. Every case here is one where continuing would
-        # hand the caller a different person than the one they asked for, and
-        # the old session is deliberately left running: a refusal must not cost
-        # somebody the browser they already had.
-        return "refused: %s" % exc
-
-    try:
-        await registry.restart(addressed(session_id, browser_id), **chosen.kwargs)
-    except Exception as exc:
-        # ⛔ Said plainly, because the dangerous reading is "that failed, carry
-        # on". Nothing is running now, and every later tool will repeat this
-        # refusal rather than quietly starting a browser without the exit that
-        # was asked for.
-        return ("the session did NOT start: %s\n"
-                "Nothing is browsing, and the tools will keep refusing until a "
-                "session_start works. A proxy that is down is the usual cause; "
-                "try another exit, or pass proxy=\"\" to go out from this "
-                "machine knowing that is what you are doing." % exc)
-    return "session started. " + chosen.describe()
-
-
-# --- pages -----------------------------------------------------------------
-
-@mcp.tool()
-async def session_new_page(session_id: str | None = None,
-                           browser_id: str | None = None) -> str:
-    """Open a new tab and make it the active one. Returns its page id.
-
-    Tabs persist across calls and across clients, so this is how you keep one
-    page while working on another rather than navigating back and forth.
-
-    session_id and browser_id are optional. Leave them out and the tab opens in
-    the default browser, as before; name them when a session holds more than
-    one, because a tab belongs to the browser it was opened in."""
-    return await _retrying(actions.new_page,
-                           session_id=session_id, browser_id=browser_id)
-
-
-@mcp.tool()
-async def session_list_pages(session_id: str | None = None,
-                             browser_id: str | None = None) -> str:
-    """Every open tab: id, title, url, and which one is active.
-
-    Use it before session_select_page: the id alone does not tell you which tab
-    you are switching to.
-
-    Starts nothing: a browser that is not running has no tabs open, and this
-    answers the empty list rather than opening one to find out. Asking what is
-    there is not the same as asking for it to exist.
-
-    session_id and browser_id are optional. Leave them out and this lists the
-    default browser's tabs, as before; name them when a session holds more than
-    one, since each browser numbers its own tabs."""
-    session = looking(session_id, browser_id)
-    if session is None:
-        return "[]"
-    return await actions.list_pages(session)
-
-
-@mcp.tool()
-async def session_select_page(page_id: str, session_id: str | None = None,
-                              browser_id: str | None = None) -> str:
-    """Switch the active tab. Every other browser_* tool acts on it.
-
-    Take the id from session_list_pages or from session_new_page.
-
-    session_id and browser_id are optional. Leave them out and this switches the
-    default browser's tab, as before; name them when a session holds more than
-    one, and use the browser the page id came from."""
-    return actions.select_page(
-        await ready(session_id, browser_id), page_id)
-
-
-@mcp.tool()
-async def session_close_page(page_id: str = "", session_id: str | None = None,
-                             browser_id: str | None = None) -> str:
-    """Close a tab, or the active one when page_id is left out.
-
-    session_id and browser_id are optional. Leave them out and this closes a tab
-    of the default browser, as before; name them when a session holds more than
-    one."""
-    return await actions.close_page(
-        await ready(session_id, browser_id), page_id)
+# ⛔ THE FOUR TAB TOOLS STOOD HERE AND ARE GONE (2026-09-11, owner's decision:
+# "si usa solo la tab principale e stop, se servono altre tab abbiamo il
+# browser di support"). A browser drives ONE page. The answer to "I need a
+# second page" is not a second tab, it is `support` - which is a better answer
+# for the case that actually comes up, because a tab in `main` carries the
+# identity's cookies and fingerprint to the second site while `support` does
+# not. That argument was already written in the instructions this server hands
+# every model; the tools contradicted it.
+#
+# What the removal does NOT claim is that a browser has exactly one page. A
+# site opens one whenever it likes - `target=_blank`, `window.open` - so the
+# machinery that decides WHICH page a command acts on stays exactly as it was,
+# in `session.page()`. What is gone is any way for a caller to make, list,
+# choose or close one: `browser_navigate` opens the first page by itself, and
+# everything else acts on the page that is there.
 
 
 # --- reading ---------------------------------------------------------------
 
 @mcp.tool()
 async def browser_navigate(url: str, wait_until: str = "domcontentloaded",
-                           session_id: str | None = None,
-                           browser_id: str | None = None) -> str:
-    """Go to a url in the active tab, opening one if none exists.
+                           browser: Browser | None = None) -> str:
+    """Go to a url in this browser's page, opening it if none exists.
 
     Answers with the HTTP status the server gave and the url actually landed
     on, which is not always the one asked for: a redirect to a login wall or a
@@ -883,16 +872,14 @@ async def browser_navigate(url: str, wait_until: str = "domcontentloaded",
     or "networkidle" for a single-page app that fetches its content after
     load.
 
-    session_id and browser_id are optional. Leave them out and this drives the
-    default browser, as before; name them when a session holds more than one."""
+    `browser` is `main` unless you say `support`, and they share nothing."""
     return await _retrying(actions.navigate, url, wait_until=wait_until,
-                           session_id=session_id, browser_id=browser_id)
+                           browser_id=browser)
 
 
 @mcp.tool()
 async def browser_read_text(selector: str = "body", max_chars: int = 6000,
-                            session_id: str | None = None,
-                            browser_id: str | None = None) -> str:
+                            browser: Browser | None = None) -> str:
     """The visible text of an element, with the markup gone.
 
     The cheapest way to read a page. Narrow the selector when you know where the
@@ -902,16 +889,14 @@ async def browser_read_text(selector: str = "body", max_chars: int = 6000,
     Long text is cut at max_chars (6000 by default) and the cut is marked in
     what comes back, so text that ends without that marker is the whole thing.
 
-    session_id and browser_id are optional. Leave them out and this reads the
-    default browser, as before; name them when a session holds more than one."""
+    `browser` is `main` unless you say `support`, and they share nothing."""
     return await actions.read_text(
-        await ready(session_id, browser_id),
+        await ready(browser),
         selector, max_chars)
 
 
 @mcp.tool()
-async def browser_snapshot(max_chars: int = 0, session_id: str | None = None,
-                           browser_id: str | None = None) -> str:
+async def browser_snapshot(max_chars: int = 0, browser: Browser | None = None) -> str:
     """Title, url, and the interactive elements that are actually visible.
 
     Each element carries a `selector` when one can reach it: pass that string to
@@ -928,16 +913,14 @@ async def browser_snapshot(max_chars: int = 0, session_id: str | None = None,
     `<select>` contributes about two hundred `<option>` nodes, which fill the
     character cap before the form the caller was looking for appears at all.
 
-    session_id and browser_id are optional: without them this snapshots the
-    default browser, as before. Name them to reach one of several.
+    `browser` is `main` unless you say `support`, and they share nothing.
     """
     return await actions.snapshot(
-        await ready(session_id, browser_id), max_chars)
+        await ready(browser), max_chars)
 
 
 @mcp.tool()
-async def browser_read_html(mode: str = "form", session_id: str | None = None,
-                            browser_id: str | None = None) -> str:
+async def browser_read_html(mode: str = "form", browser: Browser | None = None) -> str:
     """The page's HTML, cleaned down to what is worth reading.
 
     Use this when the STRUCTURE matters - a form and its labels, a table, what
@@ -953,31 +936,27 @@ async def browser_read_html(mode: str = "form", session_id: str | None = None,
     middle leaves tags that mean nothing, so it is not cut - but the answer can
     be long. Reach for browser_snapshot when you only need something to click.
 
-    session_id and browser_id are optional: without them this reads the default
-    browser, as before. Name them to reach one of several.
+    `browser` is `main` unless you say `support`, and they share nothing.
     """
     return await actions.read_html(
-        await ready(session_id, browser_id), mode)
+        await ready(browser), mode)
 
 
 @mcp.tool()
-async def browser_take_screenshot(session_id: str | None = None,
-                                  browser_id: str | None = None) -> Image:
-    """One screenshot of the active tab, on demand.
+async def browser_take_screenshot(browser: Browser | None = None) -> Image:
+    """One screenshot of this browser's page, on demand.
 
-    session_id and browser_id are optional. Leave them out and this pictures the
-    default browser, as before; name them when a session holds more than one."""
+    `browser` is `main` unless you say `support`, and they share nothing."""
     png = await actions.screenshot_png(
-        await ready(session_id, browser_id))
+        await ready(browser))
     return Image(data=png, format="png")
 
 
 @mcp.tool()
-async def browser_watch(session_id: str | None = None,
-                        browser_id: str | None = None) -> Image:
+async def browser_watch(browser: Browser | None = None) -> Image:
     """The whole browser window as a person at the machine sees it: tab strip,
     address bar, the page and the pointer, from a live capture kept running on
-    the active tab. For watching the work, not for acting on it: the picture
+    that page. For watching the work, not for acting on it: the picture
     is window pixels, so do not feed its coordinates to browser_click_at; use
     browser_take_screenshot for that.
 
@@ -985,9 +964,8 @@ async def browser_watch(session_id: str | None = None,
     refuses rather than opening one to photograph: a look is not a command, and
     the live panes call this many times a second.
 
-    session_id and browser_id are optional. Leave them out and this watches the
-    default browser, as before; name them to watch one of several."""
-    session = looking(session_id, browser_id)
+    `browser` is `main` unless you say `support`, and they share nothing."""
+    session = looking(browser)
     if session is None:
         # It REFUSES rather than answering the sentence, and only because the
         # type says so: this is declared to return an Image, and `Image | str`
@@ -1002,25 +980,21 @@ async def browser_watch(session_id: str | None = None,
 # --- acting ----------------------------------------------------------------
 
 @mcp.tool()
-async def browser_click(selector: str, session_id: str | None = None,
-                        browser_id: str | None = None) -> str:
+async def browser_click(selector: str, browser: Browser | None = None) -> str:
     """Click the first element matching a CSS selector.
 
     Scrolls it into view and waits for it to be clickable. When no selector can
     describe the target, use browser_click_at with coordinates from
     browser_snapshot.
 
-    session_id and browser_id are optional. Leave them out and this clicks in
-    the default browser, as before; name them when a session holds more than
-    one, and use the browser the selector came from."""
+    `browser` is `main` unless you say `support`, and they share nothing."""
     return await actions.click(
-        await ready(session_id, browser_id), selector)
+        await ready(browser), selector)
 
 
 @mcp.tool()
 async def browser_click_at(x: float, y: float, hold_seconds: float = 0.0,
-                           session_id: str | None = None,
-                           browser_id: str | None = None) -> Image:
+                           browser: Browser | None = None) -> Image:
     """Click (or press-and-hold) a raw viewport coordinate instead of a
     selector - for targets a selector cannot reliably reach: a slider track, a
     canvas-drawn captcha, or a precise point inside a wider element. Moves the
@@ -1040,35 +1014,29 @@ async def browser_click_at(x: float, y: float, hold_seconds: float = 0.0,
     after anything that could have moved the page, and prefer browser_click with
     the element's `selector` whenever it has one.
 
-    session_id and browser_id are optional. Leave them out and this clicks in
-    the default browser, as before; name them when a session holds more than
-    one, and use the browser the coordinates came from."""
+    `browser` is `main` unless you say `support`, and they share nothing."""
     png = await actions.click_at(
-        await ready(session_id, browser_id),
+        await ready(browser),
         x, y, hold_seconds)
     return Image(data=png, format="png")
 
 
 @mcp.tool()
-async def browser_type(selector: str, text: str, session_id: str | None = None,
-                       browser_id: str | None = None) -> str:
+async def browser_type(selector: str, text: str, browser: Browser | None = None) -> str:
     """Fill a field, replacing whatever it holds.
 
     This sets the value rather than typing key by key, so it will not fire the
     per-keystroke handlers an autocomplete needs. For those, click the field and
     use browser_press_key.
 
-    session_id and browser_id are optional. Leave them out and this types into
-    the default browser, as before; name them when a session holds more than
-    one."""
+    `browser` is `main` unless you say `support`, and they share nothing."""
     return await actions.type_text(
-        await ready(session_id, browser_id), selector, text)
+        await ready(browser), selector, text)
 
 
 @mcp.tool()
 async def browser_select_option(selector: str, value: str,
-                                session_id: str | None = None,
-                                browser_id: str | None = None) -> str:
+                                browser: Browser | None = None) -> str:
     """Choose an option in a dropdown (`<select>`), by its visible label or by
     its value.
 
@@ -1077,29 +1045,23 @@ async def browser_select_option(selector: str, value: str,
     through browser_evaluate changes it without the page seeing a real
     interaction.
 
-    session_id and browser_id are optional. Leave them out and this chooses in
-    the default browser, as before; name them when a session holds more than
-    one."""
+    `browser` is `main` unless you say `support`, and they share nothing."""
     return await actions.select_option(
-        await ready(session_id, browser_id), selector, value)
+        await ready(browser), selector, value)
 
 
 @mcp.tool()
-async def browser_press_key(key: str, session_id: str | None = None,
-                            browser_id: str | None = None) -> str:
+async def browser_press_key(key: str, browser: Browser | None = None) -> str:
     """Press a key on whatever has focus: "Enter", "Tab", "Escape",
     "ArrowDown", "Control+a", or a single character.
 
-    session_id and browser_id are optional. Leave them out and the key goes to
-    the default browser, as before; name them when a session holds more than
-    one."""
+    `browser` is `main` unless you say `support`, and they share nothing."""
     return await actions.press_key(
-        await ready(session_id, browser_id), key)
+        await ready(browser), key)
 
 
 @mcp.tool()
-async def browser_evaluate(expression: str, session_id: str | None = None,
-                           browser_id: str | None = None) -> str:
+async def browser_evaluate(expression: str, browser: Browser | None = None) -> str:
     """READ from the page with JavaScript and get the result as JSON.
 
     For what the other tools cannot see: a computed style, a value held in a
@@ -1117,10 +1079,9 @@ async def browser_evaluate(expression: str, session_id: str | None = None,
     that slips past it is still the wrong way to do the thing: report it in your
     answer rather than using it.
 
-    session_id and browser_id are optional. Leave them out and this reads the
-    default browser, as before; name them when a session holds more than one."""
+    `browser` is `main` unless you say `support`, and they share nothing."""
     return await actions.evaluate(
-        await ready(session_id, browser_id), expression)
+        await ready(browser), expression)
 
 
 def main() -> None:

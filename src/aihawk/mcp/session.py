@@ -18,8 +18,11 @@ class StealthSession:
         # else; deciding is `plan.plan_session`'s job, and only its job.
         self._kwargs = kwargs
         self._ipw: Optional[InvisiblePlaywright] = None
-        self._browser = None
-        self._context = None
+        # `Any` rather than the engine's own types, which this package does not
+        # resolve: an attribute left to be inferred from `None` makes every later
+        # use read as an error on a type that cannot have one.
+        self._browser: Any = None
+        self._context: Any = None
         self._pages: dict[str, Any] = {}
         self._active: Optional[str] = None
         self._counter = 0
@@ -127,7 +130,7 @@ class StealthSession:
         `list_pages` answers with ids alone, which is enough for this session's
         own bookkeeping and not enough for a caller. Choosing a tab by id with
         no idea what is in it is choosing blind, and until 0.9.0 that is exactly
-        what `session_list_pages` handed a model, while its description
+        what the tab tool of the day handed a model, while its description
         promised these four fields. The description was the sensible half, so
         the data moved to meet it.
 
@@ -155,10 +158,18 @@ class StealthSession:
             out.append(row)
         return out
 
-    def select_page(self, page_id: str) -> None:
-        if page_id not in self._pages:
-            raise RuntimeError(f"no such tab: {page_id}")
-        self._active = page_id
+    # ⛔ `select_page` STOOD HERE, AND NOTHING IN THE PRODUCT HAD CALLED IT
+    # SINCE THE TAB TOOLS WENT. It was the only way to move the active page
+    # by hand, which is exactly the capability removed when a browser became
+    # one page: what a caller may do is open, read and close, never choose.
+    # Three tests kept it alive and asserted through it - the same shape as
+    # `_focus` one layer up, which the product had stopped writing to while
+    # the fixtures went on reading it.
+    #
+    # The two properties those tests hold are still held, through the paths
+    # the product actually takes: `new_page` makes the newest page active,
+    # and `close_page` moves the flag when it closes the active one. Both
+    # have real callers, so the assertions now sit on live code.
 
     def page(self, page_id: Optional[str] = None):
         """The active page, or any live one, rather than a closed handle.
@@ -191,7 +202,7 @@ class StealthSession:
                     self._active = new_pid
                     return p
 
-        raise RuntimeError("no such tab; open one with session_new_page")
+        raise RuntimeError("this browser has no page open; browser_navigate opens one")
 
     #: The bound the window frame is scaled to fit. The frame is the whole
     #: window, chrome included, so this is a ceiling on the picture handed to

@@ -4,6 +4,29 @@
    rather than per conversation - which panels you keep open is a habit, not a
    property of the work. */
 const RAILKEY = 'aihawk.rail';
+
+/* How far the drawer must stop short of the bottom, so that it never lies
+   over the input. Measured rather than declared: the textarea grows with what
+   is typed. The composer knows nothing about the panel - this reads the
+   composer, and the CSS reads this.
+
+   ⛔ THE DISTANCE TO THE INPUT, NOT ITS HEIGHT, and the first version had it
+   the other way. The two are the same number only while the composer sits at
+   the bottom of the window; below 720px the panes stack and the input is in
+   the middle, where the drawer ran over it again - 34% at 719px, 43% at 600.
+   Re-measured on window resize as well as on the composer's own, because the
+   input MOVES without changing size when the layout stacks. */
+function publishRailFloor(){
+  const f = $('f'); if(!f) return;
+  const gap = Math.max(0, Math.round(window.innerHeight
+                                     - f.getBoundingClientRect().top));
+  document.documentElement.style.setProperty('--rail-bottom', gap + 'px');
+}
+if(typeof ResizeObserver === 'function' && $('f')){
+  new ResizeObserver(publishRailFloor).observe($('f'));
+}
+addEventListener('resize', publishRailFloor);
+publishRailFloor();
 function showRail(open){
   $('rail').hidden = !open;
   $('railtab').setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -46,7 +69,7 @@ async function forgetChat(id, name){
      said it had worked. */
   let gone = false;
   try {
-    const r = await fetch('/sessions/forget', {method:'POST',
+    const r = await plainDoor('/sessions/forget', {method:'POST',
                           headers:{'Content-Type':'application/json'},
                           body: JSON.stringify({id})});
     gone = r.ok && (await r.json()).forgotten;

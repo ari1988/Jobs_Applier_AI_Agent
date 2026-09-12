@@ -16,6 +16,7 @@ jobs:
   # already, which is why each package carries its own.
   english:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -26,8 +27,38 @@ jobs:
           python scripts/check_english_only.py --selftest
           python scripts/check_english_only.py
 
+  # ⛔ PYFLAKES ONLY, AND IT IS HERE BECAUSE A NameError REACHED CI ON A GREEN
+  # SUITE. `from mcp.types import ImageContent` was dropped while an import
+  # block was rewritten, in a file only the e2e job runs: an undefined name
+  # inside a function body passes `py_compile`, `--collect-only` never imports
+  # the module, and all six matrix jobs stayed green. This finds it in under a
+  # second.
+  #
+  # The rule set is pinned in pyproject (`select = ["F"]`), so the command
+  # carries no opinions of its own, this can never become an argument about
+  # formatting, and a ruff release cannot widen it under us.
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: no undefined names, no unused imports
+        run: |
+          python -m pip install --upgrade pip "ruff>=0.6"
+          ruff check src tests scripts
+
   test:
     runs-on: ${{ matrix.os }}
+    # ⛔ A CEILING, BECAUSE A JOB THAT HANGS IS NOT REPORTED AS BROKEN. On
+    # 2026-09-11 one test in the fast selection started downloading an engine
+    # and every one of these six jobs sat at 64% until GitHub killed it at its
+    # six-hour default - three pushes running. `in_progress` for six hours
+    # reads as a slow job, so nobody looks; a red one at twenty minutes is
+    # read the same minute. The whole matrix takes two minutes at rest.
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -52,6 +83,7 @@ jobs:
   # 2026-08-02 on the sibling packages, and the whole index is walked since.
   releases:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -71,6 +103,7 @@ jobs:
   # the server's own CI did before the merge, on one platform.
   e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -91,6 +124,7 @@ jobs:
   # install from the wheel can tell the difference.
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -121,6 +155,7 @@ jobs:
   version:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:

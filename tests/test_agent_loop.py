@@ -35,8 +35,7 @@ REAL SHAPES COPIED, AND WHERE THEY WERE READ
   `await mcp.call_tool(name, args)` returning a CallToolResult.
 
   Tool names and schemas are the real ones, taken from the server itself
-  (session_new_page, session_list_pages, session_select_page, session_close_page,
-  browser_navigate, browser_read_text, browser_snapshot, browser_read_html,
+  (browser_navigate, browser_read_text, browser_snapshot, browser_read_html,
   browser_take_screenshot, browser_click, browser_click_at, browser_type,
   browser_press_key, browser_evaluate).
 
@@ -52,7 +51,6 @@ import json
 import pathlib
 import time
 
-import pytest
 
 import mcp.types as mt
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
@@ -252,8 +250,8 @@ def test_every_real_tool_name_survives_in_order():
     filter that drops the session_* half. The model can only call what appears
     in this list."""
     names = [
-        "session_new_page", "session_list_pages", "session_select_page",
-        "session_close_page", "browser_navigate", "browser_read_text",
+        "browser_open", "browser_close", "browser_list",
+        "browser_status", "browser_navigate", "browser_read_text",
         "browser_snapshot", "browser_read_html", "browser_take_screenshot",
         "browser_click", "browser_click_at", "browser_type",
         "browser_press_key", "browser_evaluate",
@@ -319,10 +317,10 @@ def test_a_tool_with_no_input_schema_gets_a_valid_empty_object_schema():
     Known-bad: `getattr(t, "inputSchema", None)` alone, which yields None for the
     first case and {} for the second, both of which the API refuses."""
     class _NoSchemaTool:
-        name = "session_list_pages"
+        name = "browser_list"
         description = "Every open tab."
 
-    defs = mcp_tools_to_openai([_NoSchemaTool(), tool("session_close_page", "Close a tab.", {})])
+    defs = mcp_tools_to_openai([_NoSchemaTool(), tool("browser_close", "Close a browser.", {})])
 
     for d in defs:
         params = d["function"]["parameters"]
@@ -776,15 +774,15 @@ async def test_empty_tool_arguments_become_an_empty_dict():
     Known-bad: `json.loads(call.function.arguments)`, which raises
     JSONDecodeError on the empty string and kills the run on the most ordinary
     call there is."""
-    mcp = ScriptedMCP(tools=tools_result(tool("session_list_pages", "tabs", {})))
+    mcp = ScriptedMCP(tools=tools_result(tool("browser_list", "browsers", {})))
     model = ScriptedModel([
-        assistant_tool_calls(("c1", "session_list_pages", "")),
+        assistant_tool_calls(("c1", "browser_list", "")),
         assistant_answer("listed"),
     ])
 
     await run_task(mcp, "list the tabs", client=model, model="m")
 
-    assert mcp.calls == [("session_list_pages", {})]
+    assert mcp.calls == [("browser_list", {})]
 
 
 async def test_arguments_are_parsed_from_json_not_forwarded_as_a_string():

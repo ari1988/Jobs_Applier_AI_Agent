@@ -23,10 +23,8 @@ import sys
 
 import pytest
 
-from aihawk import agent as agent_mod
 from aihawk import link as link_mod
 from aihawk import llm as llm_mod
-from aihawk import runner
 from aihawk.runner import child_env
 
 # A sentinel that cannot occur by accident inside PATH or any other real value.
@@ -446,23 +444,31 @@ def test_the_parent_client_is_the_one_that_gets_the_key(monkeypatch):
     tests above and cannot talk to OpenRouter at all. This drives the real
     command, because `cli.ui` is what builds the client now.
     """
-    from click.testing import CliRunner
-
-    import aihawk.cli as climod
+    from _cli_brake import brake, run_cli, stopped_at_link
 
     seen = {}
     monkeypatch.setenv(KEY_NAME, KEY)
     monkeypatch.setattr(llm_mod, "make_client",
                         lambda key: seen.setdefault("client", {"api_key": key}))
 
-    class _Stop(Exception):
-        pass
+    # ⛔ THE BRAKE COMES FROM `_cli_brake`, WHICH IS THE ONLY PLACE THAT KNOWS
+    # WHERE `aihawk ui` STOPS. This test used to carry its own, aimed at
+    # `aihawk.link.Link` - a name the command stopped reading when it began
+    # building a `Sessions` registry, since `sessions.py` binds `Link` at
+    # import. The brake reached nothing, the command ran on, and uvicorn
+    # served the interface with no end inside this test: every CI matrix job
+    # hung to the six-hour ceiling on four pushes, always reporting
+    # `in_progress` rather than failing. The whole story is in that module.
+    brake(monkeypatch)
+    result = run_cli("ui")
 
-    def stop(*a, **k):
-        raise _Stop
-
-    monkeypatch.setattr(link_mod, "Link", stop)
-    CliRunner().invoke(climod.main, ["ui"])
+    # ⛔ AND THE STOP HAS TO BE SHOWN TO HAVE FIRED, which is the lesson a
+    # module docstring cannot enforce: a brake that no longer reaches the
+    # code looks exactly like a brake that works, until what sits behind it
+    # is a server with no end.
+    assert stopped_at_link(result), (
+        "the command was not stopped where this test believes it stops, so it "
+        "ran on past the point under test: %r" % (result.exception,))
 
     assert seen.get("client") == {"api_key": KEY}, (
         "the parent client never got the key, so nothing can call the model")

@@ -17,10 +17,10 @@ import traceback
 
 import click
 import pytest
-from click.testing import CliRunner
 
 import aihawk.cli as climod
-import aihawk.link as link_mod
+import aihawk.sessions as sessions_mod
+from _cli_brake import LinkRecorder, brake, run_cli, stopped_at_link  # noqa: F401
 from aihawk.llm import BASE_URL, DEFAULT_MODEL
 from aihawk.runner import child_env
 
@@ -77,46 +77,23 @@ def clean_provider_env(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
 
 
-class _Stop(Exception):
-    """Raised by the recorder so the command stops before it serves anything."""
-
-
-class LinkRecorder:
-    """Stands in for `Link`: records how it was constructed, then stops.
-
-    `ui` decides everything this file is about - which key, which model, which
-    browser options - and then hands them to `Link`. Recording that hand-over is
-    the last point where the decisions are visible and the first point where a
-    real browser would be launched, so it is where the command is stopped.
-    """
-
-    def __init__(self):
-        self.calls: list[dict] = []
-
-    def __call__(self, opts=None, *, key=None):
-        self.calls.append({"opts": dict(opts or {}), "key": key})
-        raise _Stop
-
-    @property
-    def call(self) -> dict:
-        assert len(self.calls) == 1, f"expected one Link, got {len(self.calls)}"
-        return self.calls[0]
-
-
 @pytest.fixture
 def link(monkeypatch):
-    rec = LinkRecorder()
-    monkeypatch.setattr(link_mod, "Link", rec)
-    return rec
+    """The brake, from the one module that knows where `ui` is stopped.
+
+    ⛔ NOT PATCHED HERE ANY MORE. It was, correctly, and the file next door
+    patched a different name that reached nothing - which is how a unit test
+    came to serve the interface forever. `_cli_brake` is now the only place
+    that knows the seam, and a gate in `test_the_suite_reads_no_real_session`
+    keeps it that way.
+    """
+    return brake(monkeypatch)
 
 
 def run(*args, **kwargs):
-    return CliRunner().invoke(climod.main, list(args), **kwargs)
-
-
-def stopped_at_link(result) -> bool:
-    """The command got as far as connecting, which is as far as we let it."""
-    return isinstance(result.exception, _Stop)
+    """Every invocation in this file goes through the shared runner, which
+    also gives `ui` an address nothing can bind."""
+    return run_cli(*args, **kwargs)
 
 
 # --------------------------------------------------------------------------
@@ -398,7 +375,7 @@ def test_the_key_is_never_echoed_on_any_path(monkeypatch, link):
     def explode(*a, **k):
         raise RuntimeError("the browser did not start")
 
-    monkeypatch.setattr(link_mod, "Link", explode)
+    monkeypatch.setattr(sessions_mod, "Link", explode)
     crashed = run("ui", "--openrouter-key", FAKE_KEY)
     outputs["crash"] = crashed.output
     if crashed.exception is not None:

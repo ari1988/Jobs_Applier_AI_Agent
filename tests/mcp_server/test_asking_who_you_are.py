@@ -19,7 +19,7 @@ from __future__ import annotations
 import pytest
 
 from aihawk.mcp import server
-from aihawk.mcp.registry import SessionRegistry
+from aihawk.mcp.registry import BrowserRegistry
 
 
 class _Recording:
@@ -45,7 +45,7 @@ def registry(monkeypatch):
     def _explode():
         raise AssertionError("session_status resolved a plan, so it is not read only")
 
-    reg = SessionRegistry(factory=_Recording, defaults=_explode)
+    reg = BrowserRegistry(factory=_Recording, defaults=_explode)
     monkeypatch.setattr(server, "registry", reg)
     return reg
 
@@ -61,18 +61,18 @@ HERE = server.addressed()
 
 
 async def test_with_nothing_running_it_says_so(registry):
-    answer = await server.session_status()
+    answer = await server.browser_status()
 
     assert "no browser is running" in answer
-    assert "session_start" in answer, "it does not say how to choose who to be"
+    assert "browser_open" in answer, "it does not say how to choose who to be"
 
 
 async def test_asking_starts_nothing(registry):
     """⛔ The load-bearing one. The fixture's default factory raises, so a
-    session_status that resolved a plan fails here rather than quietly launching
+    browser_status that resolved a plan fails here rather than quietly launching
     a browser - and, with a profile configured, quietly writing an identity into
     it as the side effect of a question."""
-    await server.session_status()
+    await server.browser_status()
 
     # Every key, not just the one it would have used: a browser started under
     # any address at all is a browser this tool was not supposed to start.
@@ -84,12 +84,19 @@ async def test_it_reports_the_running_identity(registry):
                            proxy={"server": "socks5://exit-a.invalid:1080"},
                            profile_dir="C:/tmp/acct-a")
 
-    answer = await server.session_status()
+    answer = await server.browser_status()
 
     assert "4242" in answer
     assert "socks5://exit-a.invalid:1080" in answer
     assert "C:/tmp/acct-a" in answer
-    assert "tab-1" in answer and "example.invalid" in answer
+    assert "example.invalid" in answer, "it does not say where the browser is"
+    # ⛔ THE PAGE ID IS DELIBERATELY ABSENT SINCE 2026-09-11. It used to report
+    # `tab-1 https://...`, which was a vocabulary a caller could act on while
+    # the tab tools existed. They are gone: there is no tool that takes a page
+    # id, so printing one offers a handle to something nothing accepts, and a
+    # model that reads it will spend a turn looking for the tool that uses it.
+    assert "tab-1" not in answer, (
+        "the status hands back a page id no tool takes any more: %r" % answer)
 
 
 async def test_it_reports_the_identity_of_a_browser_that_died(registry):
@@ -98,7 +105,7 @@ async def test_it_reports_the_identity_of_a_browser_that_died(registry):
     await registry.restart(HERE, seed=4242, headless=True)
     await registry.drop(HERE)
 
-    answer = await server.session_status()
+    answer = await server.browser_status()
 
     assert "4242" in answer, "a dead browser lost the identity it will come back as"
     assert "not up" in answer
@@ -111,7 +118,7 @@ async def test_it_never_prints_a_proxy_password(registry):
                            proxy={"server": "socks5://exit-a.invalid:1080",
                                   "username": "u", "password": "hunter2"})
 
-    answer = await server.session_status()
+    answer = await server.browser_status()
     # The subject is checked before the absence: "hunter2 is not in this string"
     # is true of every string that is not about a proxied session, so without
     # this line the test passes hardest when it has stopped testing anything.

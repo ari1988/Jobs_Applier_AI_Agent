@@ -46,11 +46,11 @@ def summarise(name: str, args: dict | None) -> str:
     """
     args = args or {}
     where = ""
-    if name.startswith("browser_") and name != "browser_open" and args.get("browser_id"):
-        where = " in %s" % _short(args["browser_id"], 24)
+    if name.startswith("browser_") and name != "browser_open" and args.get("browser") == "support":
+        where = " in support"
 
     if name == "browser_open":
-        return _short(args.get("browser_id") or "", 40)
+        return _short(args.get("browser") or "main", 40)
     if name == "browser_navigate":
         return _short(args.get("url", ""), 80) + where
     if name in ("browser_click",):
@@ -75,10 +75,7 @@ def summarise(name: str, args: dict | None) -> str:
         return "mode=%s" % _short(args.get("mode", "form"), 20) + where
     if name == "browser_evaluate":
         return _short(args.get("expression", ""), 70)
-    if name in ("session_select_page", "session_close_page"):
-        return _short(args.get("page_id", ""), 40)
-    if name in ("browser_snapshot", "browser_take_screenshot",
-                "session_new_page", "session_list_pages"):
+    if name in ("browser_snapshot", "browser_take_screenshot"):
         return where.strip()
 
     if not args:

@@ -19,16 +19,38 @@
    Anchored to the spine's own width so the two are one object, and lifted with
    a shadow rather than a border, because what says "this is over that" is the
    shadow. */
-#rail { position:absolute; top:0; bottom:0; left:0; width:var(--drawer);
+/* ⛔ IT STOPS ABOVE THE COMPOSER, AND THAT IS NOT DECORATION. Full height, it
+   covered 256px of the 530px input - measured 2026-09-11, and `elementFromPoint`
+   on the corner of the textarea answered `chats`, so half of the only input on
+   the page was dead with nothing saying so. The rule that used to prevent it
+   padded the transcript out of the way, and that rewrapped every paragraph as
+   the panel appeared, which is what it was removed for.
+
+   So the CHAT still knows nothing: the coupling runs the other way, and the
+   panel knows where the input begins.
+
+   ⛔ AND IT IS THE DISTANCE TO THE INPUT, NOT THE HEIGHT OF IT. The first
+   version published the composer's height, which is the same number only
+   while the composer sits at the bottom of the window. Below 720px the panes
+   stack - the conversation becomes `60vh` with the browser under it - so the
+   input is in the MIDDLE of the window and the drawer ran straight over it
+   again: measured 34% at 719px and 43% at 600px, in a real browser, on the
+   build that was supposed to have fixed this. `I made it vertical so it holds
+   at every width` was the claim, and eight widths said otherwise. */
+#rail { position:absolute; top:0; bottom:var(--rail-bottom, 0px);
+        left:var(--spine); width:var(--drawer);
         z-index:5; display:flex; flex-direction:column;
         background:var(--well); border-right:1px solid var(--line-1);
         box-shadow:14px 0 34px -18px #000 }
 /* The header of the column lines up with the header of the conversation beside
    it: same height, same padding, so the two read as one row across the app. */
-/* The left padding is the button's: it is drawn over this header now, so the
-   word starts after it instead of under it. */
+/* ⛔ NO LEFT PADDING FOR THE BUTTON ANY MORE, and this said the opposite until
+   2026-09-11. The button used to leave the flow when the column opened and be
+   redrawn over this header, which is what made the whole window slide 48px;
+   it stays in the frame now and the drawer starts to its right, so this header
+   has nothing of anybody else's to make room for. */
 #railhead{ flex:none; height:var(--topbar); display:flex; align-items:center;
-           gap:8px; padding:0 var(--s3) 0 var(--spine);
+           gap:8px; padding:0 var(--s3);
            border-bottom:1px solid var(--line-1) }
 #railhead .label{ flex:1 }
 #newchat{ flex:none; width:48px; height:48px; display:grid;
@@ -101,12 +123,18 @@
    where it belonged, 48 by 56 at the top-left corner, and invisible. The
    ladder this page uses is 2 for the jump button, 5 for the panel, 6 above it,
    20 for the skip link. */
-#railtab[aria-expanded="true"]{ position:absolute; top:0; left:0; z-index:6;
-                                width:var(--spine); height:var(--topbar);
-                                padding:0; display:grid; place-items:center;
-                                background:transparent; box-shadow:none;
-                                color:var(--fg-2) }
-#railtab[aria-expanded="true"]:hover{ color:var(--fg); background:transparent }
+/* ⛔ OPEN, THE SPINE NO LONGER GIVES ITS WIDTH AWAY, AND THE RULE THAT DID
+   THAT STOOD HERE. It took the button out of the flow so those 48px went back
+   to the conversation: measured 2026-09-11, opening the column moved `#left`
+   from x=48 to x=0 and widened the browser pane by 48 - the whole window
+   sliding to open a panel. The owner named it by looking at it: the bar has
+   to LIVE ON TOP, and the chat must not know a thing about it.
+
+   So the spine belongs to the frame and stays put, the drawer slides out to
+   its right and covers the near edge of the conversation, and not one
+   measurement of anything else changes. What is left is the state drawn on
+   the button, which moves nothing. */
+#railtab[aria-expanded="true"]{ background:var(--raised); color:var(--fg) }
 #railtab[aria-expanded="true"]::after{ content:none }
 /* ⛔ THE PANEL FOLDS, THE WAY IN DOES NOT. Both used to disappear at the
    same breakpoint, and `#newchat` lives inside the panel - so a window snapped

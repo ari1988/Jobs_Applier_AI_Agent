@@ -49,7 +49,6 @@ $('mode').onclick = (e) => {
    wrong number. The ceiling below is the measured budget - 40 requests a
    second, about a quarter of the pipe - and the top rate is what the engine
    is asked to produce, so asking for more would make frames to throw away. */
-const LAYOUTS = [1, 2, 4];
 const TOPRATE = 25, CEILING = 40;
 const fps = (n) => Math.min(TOPRATE, Math.floor(CEILING / n));
 const onScreen = () => Math.max(1, $('stage').children.length);
@@ -80,9 +79,18 @@ const pause = () => Math.round(1000 / (fps(onScreen()) * onScreen()));
    asking about. See `vanish`. */
 const looking = () => !document.hidden && !vanished;
 
+/* ⛔ THE RE-ARM SITS IN A `finally`, AND IT IS NOT ONE BELT TOO MANY. A pump
+   that re-arms AFTER the work dies for good on the first exception: it does
+   not skip a turn, it stops. Measured 2026-09-11 on the address bar, where the
+   inner `try` had been taken away while rewriting the function - and the same
+   shape was already latent in two more pumps, whose `try` covered the fetch
+   and not the lines around it. The empty `catch` keeps one turn quiet; the
+   `finally` keeps the chain alive whatever happens, and together they take the
+   question "did I remember the try?" out of every function a chain calls. */
 async function tick(){
-  if(looking()){ try { await onePass(); } catch(err) {} }
-  setTimeout(tick, pause());
+  try { if(looking()) await onePass(); }
+  catch(err){}
+  finally { setTimeout(tick, pause()); }
 }
 
 /* And the moment it is looked at again, before the next tick lands. */
@@ -224,32 +232,13 @@ function paintUrl(u){
   const part = (t,c) => urlEl.appendChild(el('span', c, t));
   part(a.protocol + '//', 'dim'); part(a.host, 'host'); part(a.pathname + a.search, 'dim');
 }
-function paintTabs(rows){
-  const box = $('tabs');
-  /* One tab is not a strip. Showing it would be chrome repeating the address
-     bar directly beneath it. */
-  if(!rows || rows.length < 2){ box.hidden = true; box.textContent = ''; return; }
-  box.hidden = false;
-  box.textContent = '';
-  for(const r of rows){
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.setAttribute('aria-selected', String(!!r.active));
-    b.title = (r.title || '') + (r.url ? '  -  ' + r.url : '');
-    b.dataset.id = r.id;
-    let host = '';
-    try { host = new URL(r.url).host; } catch(err) { host = ''; }
-    b.appendChild(el('span','t', r.title || host || r.id));
-    box.appendChild(b);
-  }
-}
-/* A tab DOES something, so it is the one thing in this chrome that may look
-   clickable. Selecting is an action on the browser like any other, and it goes
-   through the same tool an agent would call. */
-$('tabs').onclick = (e) => {
-  const b = e.target.closest('button'); if(!b) return;
-  ask('/live/select', {id: b.dataset.id}, 'Could not switch to that tab');
-};
+/* ⛔ THE TAB STRIP STOOD HERE AND IS GONE WITH THE TOOLS THAT FED IT. A
+   browser drives one page, so there was never more than one chip to draw -
+   this function already refused to draw a strip of one, calling it "chrome
+   repeating the address bar directly beneath it". What it still carried was a
+   CLICK: a way for the person to move the active page under the agent, which
+   is the same second-control defect the open/close/focus/wake buttons were
+   removed for. The address below is the half anybody read. */
 
 /* ⛔ THE ADDRESS FOLLOWS THE SCREEN YOU ARE LOOKING AT, and with four of them
    there is a case where no single address is the honest answer: nobody has
@@ -263,33 +252,48 @@ function severalOpen(n){
                el('span', 'hint', 'click a screen to follow it'));
 }
 
-/* ⛔ THE WORK AND THE TIMER ARE SEPARATE, for the reason the strip beside it
-   was: changing the layout changes what the address should say, and there is
+/* ⛔ THE WORK AND THE TIMER ARE SEPARATE. Changing the layout changes what the address should say, and there is
    nothing to wait for. While this was one function the bar kept the old answer
    until the next poll landed - two seconds showing one page's address over four
    screens. Calling `where` itself from a click would start a SECOND timer
    chain, which is how a pace stops being one number. */
-async function where(){ if(looking()) await paintWhere(); setTimeout(where, 2000); }
+async function where(){
+  try { if(looking()) await paintWhere(); }
+  catch(err){}
+  finally { setTimeout(where, 2000); }
+}
 
-async function paintWhere(){
+/* Which url the address bar says, given the rows the workspace already has.
+
+   ⛔ PURE, AND THAT IS THE POINT: it is the one piece of this file a test can
+   run without a browser, and the two ways of getting it wrong both look
+   exactly right from the outside. Reading `urls[0]` agrees with `url` until a
+   site opens a second page, and answering the FOCUSED row ignores a pinned
+   pane, so the bar names a browser nobody is looking at.
+
+   ⛔ AND IT USED TO BE A ROUTE. `/live/address` asked `browser_list` a second
+   time on a second timer for a field these rows already carry - a round trip
+   every two seconds for something in memory here, and an answer that went
+   stale the moment somebody pinned a pane, because the browser being watched
+   is a fact of this page and not of the server. */
+function addressOf(rows, who){
+  const list = Array.isArray(rows) ? rows : [];
+  const row = list.find(b => b && (who ? b.id === who : b.focused));
+  return (row && row.url) || '';
+}
+
+function paintWhere(){
   const many = grid > 1 && !pinned2 && onStage().length > 1;
-  if(many){ severalOpen(onStage().length); paintTabs([]); }
-  else try {
-    const who = watched();
-    /* ⛔ AND NEVER OF A BROWSER THAT IS NOT RUNNING. Asking for the tabs of a
-       declared-but-stopped browser STARTS it - the server resolves the id and
-       the registry wakes the engine - so clicking a stopped browser's chip
-       spent 800 MB and seven seconds nobody asked for, and then kept asking
-       every two seconds because the pin never cleared. The frame pump, the
-       preview row and both cell builders already know this rule; this was the
-       fifth place that had to and did not. */
-    if(who && !fleet.some(b => b.id === who && b.running)){
-      paintUrl(''); paintTabs([]); return;
-    }
-    /* `at`, inside `door`, is what adds the question mark, so the browser goes
-       in as one too and it appends its own with an ampersand. */
-    const r = await door(who ? '/live/tabs?b=' + encodeURIComponent(who)
-                             : '/live/tabs', {cache:'no-store'});
-    if(r.ok){ const j = await r.json(); paintUrl(j.url || ''); paintTabs(j.tabs); }
-  } catch(err){}
+  if(many){ severalOpen(onStage().length); return; }
+  const who = watched();
+  /* A browser that is not running has no address, and `fleet` already says
+     which ones are running, so this is the difference between a blank bar
+     and a stale one. It is NO LONGER A SAFETY RULE here, and it was: when
+     this asked the tab tool, that tool resolved its browser through `ready`
+     and so woke a stopped one - 800 MB and seven seconds for a chip nobody
+     clicked twice. Nothing is asked from here at all now. The safety version
+     of the rule still binds the frame pump, the preview row and both cell
+     builders, which ask tools that DO wake. */
+  if(who && !fleet.some(b => b.id === who && b.running)){ paintUrl(''); return; }
+  paintUrl(addressOf(fleet, who));
 }
