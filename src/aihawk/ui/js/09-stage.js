@@ -35,7 +35,11 @@ function screenFor(b, current){
   const cell = document.createElement('button');
   cell.type = 'button'; cell.className = 'screen'; cell.dataset.id = b.id;
   cell.setAttribute('aria-current', String(current));
+  /* The NAME is the action and the state is the description. With the name
+     taken from the contents, a screen reader heard the address, the tag and
+     the veil's sentence run together, and `title` was never the name. */
   cell.title = 'Watch ' + b.id;
+  cell.setAttribute('aria-label', 'Watch ' + b.id);
   const box = el('div','frame');
   const im = document.createElement('img'); im.alt = ''; im.hidden = true;
   const tag = el('span','tag');
@@ -48,7 +52,9 @@ function screenFor(b, current){
     tag.appendChild(dot);
   }
   const stamp = el('span','stamp'); stamp.hidden = true;
-  box.append(im, el('div','veil'), tag, stamp);
+  const veil = el('div','veil'); veil.id = 'veil-' + b.id;
+  cell.setAttribute('aria-describedby', veil.id);
+  box.append(im, veil, tag, stamp);
   cell.appendChild(box);
   /* Three states and not two, and the third is the one that reads as a
      failure: a browser that is RUNNING WITH NO TAB cannot be captured - the
@@ -96,15 +102,16 @@ function drawStage(){
        guess where the button is. There is no button - browsers are opened by
        asking - so this is the one place that has to say so, and to show the
        shape of the sentence that does it. */
-    const cell = el('div','empty');
-    cell.append(el('b', null, 'No browser open'),
-                el('span', null, 'Ask in the chat and one opens here. There is no button for it, on purpose.'),
-                el('code', null, 'open a browser and go to example.com'));
-    box.appendChild(cell);
+    box.appendChild(emptyCell.cloneNode(true));
     return;
   }
   for(const b of show) box.appendChild(screenFor(b, b.id === watched()));
 }
+
+/* Taken before anything can empty the stage: the same three lines used to be
+   built here AND described in the markup, which is one sentence in two
+   places waiting to disagree. */
+const emptyCell = $('stage').firstElementChild.cloneNode(true);
 
 async function drawFleet(){
   let got = {browsers: []};

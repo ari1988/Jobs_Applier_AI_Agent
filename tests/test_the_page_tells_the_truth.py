@@ -46,12 +46,20 @@ def test_a_refused_delete_is_not_drawn_as_a_delete():
     being navigated away, and leaving the session and its browsers exactly where
     they were - with every visible signal saying it had worked.
 
-    Known-bad: stop reading the answer.
+    ⛔ AND IT SAYS SO IN THE PANEL, NOT IN THE TRANSCRIPT, which is what this
+    assertion used to name. The sentence went to the conversation - the thing
+    the open panel is lying on top of and has just put out of play - so it
+    landed where the person who pressed the button could not read it. The
+    property is unchanged and the place it is said moved, so the literal moved
+    with it rather than the gate being dropped.
+
+    Known-bad: stop reading the answer, or say it into the transcript again.
     """
     body = CODE[CODE.index("async function forgetChat"):]
     body = body[:body.index("\n}")]
     assert "forgotten" in body, "the answer to the delete is never read"
-    assert "orphan(" in body, "a refused delete says nothing to the person who asked"
+    assert "railsay(" in body, (
+        "a refused delete says nothing where the person who asked can read it")
 
 
 def test_every_event_the_server_can_send_is_drawn():
@@ -429,17 +437,26 @@ def test_a_deleted_conversation_stops_the_page_asking_about_it():
     """The other half of the same defect: the server refuses now, and the page
     has to stop rather than retry a 410 four times a second in three loops.
 
-    Known-bad: leave `looking` reading only `document.hidden`, or drop the
-    `vanish` guard so the page keeps a live composer over a dead session.
+    ⛔ AND THE FLAG IS NOT WRITTEN BY HAND ANY MORE, which is why this names a
+    call instead of an assignment. The browser pane has a SECOND reason to be
+    out of play - the sessions panel lying on top of it - and the two are set
+    from different files, so whichever let go last won: closing the panel over
+    a deleted conversation brought the pane back fully lit on a page where
+    nothing is live. A box is held while any reason holds it.
+
+    Known-bad: leave `looking` reading only `document.hidden`; drop the
+    `vanish` guard so the page keeps a live composer over a dead session; or
+    write `box.inert = true` here again, which passes every assertion in this
+    file and loses the hold the moment a panel is closed.
     """
     assert "!document.hidden && !vanished" in CODE, (
         "the four loops go on polling a conversation that does not exist")
     body = CODE[CODE.index("function vanish()"):]
     body = body[:body.index("\n}")]
     assert "es.close()" in body, "the event stream is left open on a dead session"
-    assert "box.inert = true" in body, (
+    assert "outOfPlay(box, 'deleted', true)" in body, (
         "the composer still answers the keyboard for a conversation that cannot "
-        "receive anything")
+        "receive anything, or it is held by a flag anybody else can clear")
     assert "orphan(" in body, "the page says nothing about why it went quiet"
 
 
@@ -455,7 +472,11 @@ def test_a_subtree_that_cannot_be_used_does_not_look_usable():
     Known-bad: drop the rule and let each caller remember to dim its own subtree.
     """
     css = CODE[CODE.index("<style>"):CODE.index("</style>")]
-    assert re.search(r"\[inert\]\{[^}]*opacity", css), (
+    # ⛔ ONE RULE FOR THE CLASS, so the selector is shared with `:disabled` and
+    # `[aria-disabled]`: four rules used to say "cannot be used" with two
+    # different numbers. The pattern allows the company and still demands that
+    # an inert subtree is what the rule dims.
+    assert re.search(r"\[inert\][^{]*\{[^}]*opacity", css), (
         "nothing makes an inert subtree look inert, so every control inside one "
         "keeps inviting an action it cannot perform")
 
@@ -838,7 +859,7 @@ def test_a_reopened_conversation_keeps_the_answer_of_every_turn():
 
     js = (whole("function flush(", chr(10) + "}") + chr(10)
           + whole("const onEvent =", chr(10) + "};") + chr(10)
-          + "let drawn = [];\nglobalThis.hold = null; globalThis.busyNow = false;\nglobalThis.live = null; globalThis.timer = 0; globalThis.queued = null;\nglobalThis.LEAD = /^(I will |I'll |Let me )/i;\nglobalThis.el = (tag, cls, t) => ({tag, cls, t, kids: [],\n                                   appendChild(k){ this.kids.push(k); }});\nglobalThis.rich = t => ({tag: 'rich', t});\nglobalThis.put = n => drawn.push(n);\nglobalThis.$ = () => ({textContent: '', hidden: false});\nfor (const name of ['wipe','waiting','waited','drawChats','paint',\n                    'settleOnce','newTurn','step','land','orphan',\n                    'setQueued','send','clearInterval'])\n  globalThis[name] = () => {};\n\nconst feed = m => onEvent({data: JSON.stringify(m)});\nconst history = [\n  {kind:'you',    text:'first instruction',  replay:true},\n  {kind:'said',   text:'Let me open the page.', replay:true},\n  {kind:'tool',   text:'browser_navigate a', replay:true},\n  {kind:'result', text:'ok',                 replay:true},\n  {kind:'said',   text:'THE FIRST ANSWER.',  replay:true},\n  {kind:'you',    text:'second instruction', replay:true},\n  {kind:'tool',   text:'browser_navigate b', replay:true},\n  {kind:'result', text:'ok',                 replay:true},\n  {kind:'said',   text:'THE SECOND ANSWER.', replay:true},\n];\nhistory.forEach(feed);\n/* what the server sends after the replay, once it is idle */\nfeed({kind:'busy', text:'0'});\nconst answers = drawn.filter(d => d.cls === 'answer')\n                     .map(d => (d.kids[0] && d.kids[0].t) || '');\nprocess.stdout.write(JSON.stringify({answers, total: drawn.length}));")
+          + "let drawn = [];\nglobalThis.hold = null; globalThis.busyNow = false;\nlet announced = [], later = null;\nglobalThis.quiet = 0;\nglobalThis.thread = {setAttribute(k, v){ announced.push(v); }};\nglobalThis.clearTimeout = () => {};\nglobalThis.setTimeout = (fn) => { later = fn; return 1; };\nglobalThis.live = null; globalThis.timer = 0; globalThis.queued = null;\nglobalThis.LEAD = /^(I will |I'll |Let me )/i;\nglobalThis.el = (tag, cls, t) => ({tag, cls, t, kids: [],\n                                   appendChild(k){ this.kids.push(k); }});\nglobalThis.rich = t => ({tag: 'rich', t});\nglobalThis.put = n => drawn.push(n);\nglobalThis.$ = () => ({textContent: '', hidden: false});\nfor (const name of ['wipe','waiting','waited','drawChats','paint',\n                    'settleOnce','newTurn','step','land','orphan',\n                    'setQueued','send','clearInterval'])\n  globalThis[name] = () => {};\n\nconst feed = m => onEvent({data: JSON.stringify(m)});\nconst history = [\n  {kind:'you',    text:'first instruction',  replay:true},\n  {kind:'said',   text:'Let me open the page.', replay:true},\n  {kind:'tool',   text:'browser_navigate a', replay:true},\n  {kind:'result', text:'ok',                 replay:true},\n  {kind:'said',   text:'THE FIRST ANSWER.',  replay:true},\n  {kind:'you',    text:'second instruction', replay:true},\n  {kind:'tool',   text:'browser_navigate b', replay:true},\n  {kind:'result', text:'ok',                 replay:true},\n  {kind:'said',   text:'THE SECOND ANSWER.', replay:true},\n];\nhistory.forEach(feed);\n/* what the server sends after the replay, once it is idle */\nfeed({kind:'busy', text:'0'});\nconst answers = drawn.filter(d => d.cls === 'answer')\n                     .map(d => (d.kids[0] && d.kids[0].t) || '');\nif (later) later();\nprocess.stdout.write(JSON.stringify({answers, total: drawn.length, announced}));")
     done = subprocess.run([node, "-e", js], capture_output=True, text=True,
                           encoding="utf-8", timeout=30)
     assert done.returncode == 0, done.stderr
@@ -847,35 +868,51 @@ def test_a_reopened_conversation_keeps_the_answer_of_every_turn():
     assert got["answers"] == ["THE FIRST ANSWER.", "THE SECOND ANSWER."], (
         "a reopened conversation lost the answer of a turn that is not the "
         "last: %r" % (got["answers"],))
+    #: ⛔ AND THE REPLAY IS NOT READ OUT. The transcript is the page's only
+    #: live region, and a reconnect pours the whole conversation back into it:
+    #: a screen reader announced an hour of finished work from the top while
+    #: the agent went on adding to it. Silenced for the burst and restored
+    #: after, because leaving it off for good is the louder bug told quietly.
+    assert got["announced"] and got["announced"][0] == "off", (
+        "a replayed conversation is announced as though it were happening "
+        "now: %r" % (got["announced"],))
+    assert got["announced"][-1] == "polite", (
+        "the live region is left switched off after a replay, so nothing the "
+        "agent does afterwards is announced at all: %r" % (got["announced"],))
+
     #: and the lead-in is still dropped, which is the thing this must not undo.
     assert not any("open the page" in a for a in got["answers"]), (
         "the sentence that came with the tool calls came back as an answer")
 
 
-def test_the_session_drawer_never_covers_the_input():
-    """⛔ THE DRAWER COVERED HALF THE ONLY INPUT ON THE PAGE, and the gate
-    written for the drawer could not see it.
+def test_the_sessions_panel_puts_the_page_behind_it_out_of_play():
+    """⛔ IT COVERED HALF THE CONVERSATION AND LEFT IT LOOKING READABLE.
 
-    That gate asserts that nothing outside the rail reacts to the rail being
-    open, which is true and was the defect of the day before. It is a scan over
-    selectors, so it knows nothing about where a box ends up: the rail ran the
-    full height of the window and lay over the composer. Measured 2026-09-11 in
-    a real browser: 256px of the 530px input, and `elementFromPoint` on the
-    corner of the textarea answered `chats`. Half of the only way to talk to
-    the agent was dead, with nothing saying so.
+    Measured 2026-09-12 in a real browser at eight widths, drawer open: 240px
+    off the front of every line at every desktop width - 48% of the measure at
+    1440px, 61% at 960px, 29 rows buried at once and one of them whole. The
+    owner read it off his own screen before any gate did: lines beginning
+    `.com/it/ navigated to`, with the verb and the step number underneath the
+    panel.
 
-    The rule that used to prevent it padded the transcript out of the way, and
-    that rewrapped every paragraph as the panel appeared - which is what it was
-    removed for. So the coupling runs the other way now: the CHAT still knows
-    nothing, and the PANEL knows where the input begins.
+    The gate that stood here asserted that the drawer stopped SHORT of the
+    composer, which was the defect of the day before and is now a question that
+    cannot be asked: with the page behind it inert, the panel may cover the
+    input, because the input is out of play anyway. So the property moved. It
+    is no longer where the panel stops, it is what it holds while it is up.
 
-    Measured and not declared, because the textarea grows with what is typed:
-    a constant would be right until somebody wrote a third line.
+    Three things are executed rather than read, because the text cannot answer
+    any of them: that opening holds both panes and closing releases them, that
+    the keyboard goes in and comes back, and that a hold SOMEBODY ELSE is
+    keeping survives this panel letting go of its own. The last one is why
+    `outOfPlay` exists at all - a conversation deleted in another tab holds the
+    browser pane, and a plain `inert = false` from here would bring that pane
+    back fully lit on a page where nothing is live.
 
-    Known-bad: anchor the rail to the bottom of the window again, or publish a
-    composer's HEIGHT instead of the distance to it: the same number only
-    while the composer sits at the bottom of the window, and below 720px the
-    panes stack and it does not.
+    Known-bad, all three run: write `box.inert = open` in place of the call to
+    `outOfPlay` and the deleted pane revives; drop the `hadFocus` check and the
+    keyboard is left standing on the document; drop the focus into the panel
+    and it never arrives.
     """
     import json
     import shutil
@@ -883,25 +920,586 @@ def test_the_session_drawer_never_covers_the_input():
 
     import pytest
 
-    #: the panel has to stop at the variable, not at the window.
-    style = CODE[CODE.index("#rail {"):]
-    style = style[:style.index("}") + 1]
-    assert "bottom:var(--rail-bottom" in style.replace(" ", ""), (
-        "the drawer is anchored to the bottom of the window again, so it lies "
-        "over the composer: %r" % " ".join(style.split()))
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("needs node to EXECUTE the panel rather than read it")
+
+    #: `outOfPlay` and its map, from the file that owns them.
+    owner = CODE[CODE.index("const heldBy = new WeakMap();"):]
+    owner = owner[:owner.index(chr(10) + "}") + 2]
+    #: the key, the panel's own line and `showRail`, up to its first caller.
+    panel = CODE[CODE.index("const RAILKEY"):]
+    panel = panel[:panel.index("$('railtab').onclick")]
+
+    harness = [
+        "const made = {};",
+        "const box = id => (made[id] = {id, hidden:false, inert:false,",
+        "  attrs:{}, kids:[],",
+        "  setAttribute(k, v){ this.attrs[k] = v; },",
+        "  getAttribute(k){ return this.attrs[k]; },",
+        "  contains(n){ return n === this || this.kids.indexOf(n) >= 0; },",
+        "  focus(){ globalThis.document.activeElement = this; }});",
+        "['rail','railtab','left','right','newchat','chats','f'].forEach(box);",
+        "made.rail.kids = [made.newchat, made.chats];",
+        "made.left.kids = [made.f];",
+        "globalThis.$ = id => made[id];",
+        "globalThis.document = {activeElement: made.railtab};",
+        "globalThis.drawChats = () => {};",
+        "globalThis.addEventListener = () => {};",
+        "globalThis.localStorage = {seen:{},",
+        "  setItem(k, v){ this.seen[k] = v; }, getItem(k){ return this.seen[k]; }};",
+        "const shot = () => ({left: made.left.inert, right: made.right.inert,",
+        "  hidden: made.rail.hidden, focus: document.activeElement.id,",
+        "  expanded: made.railtab.getAttribute('aria-expanded'),",
+        "  remembered: localStorage.getItem('aihawk.rail')});",
+        "showRail(true);  const opened = shot();",
+        "showRail(false); const closed = shot();",
+        "/* somebody else is holding the browser pane: opening and closing this",
+        "   panel over it must not hand that pane back. */",
+        "outOfPlay(made.right, 'deleted', true);",
+        "showRail(true); showRail(false);",
+        "process.stdout.write(JSON.stringify({opened, closed,",
+        "                                     survives: made.right.inert}));",
+    ]
+
+    done = subprocess.run(
+        [node, "-e", owner + chr(10) + panel + chr(10) + chr(10).join(harness)],
+        capture_output=True, text=True, encoding="utf-8", timeout=30)
+    assert done.returncode == 0, done.stderr
+    got = json.loads(done.stdout)
+
+    assert got["opened"] == {"left": True, "right": True, "hidden": False,
+                             "focus": "newchat", "expanded": "true",
+                             "remembered": "1"}, (
+        "opening the panel does not take the page behind it out of play, or "
+        "does not take the keyboard with it: %r" % (got["opened"],))
+
+    assert got["closed"] == {"left": False, "right": False, "hidden": True,
+                             "focus": "railtab", "expanded": "false",
+                             "remembered": "0"}, (
+        "closing the panel leaves the page held, or leaves the keyboard "
+        "standing on the document: %r" % (got["closed"],))
+
+    assert got["survives"] is True, (
+        "closing the panel released a hold it never took: a conversation "
+        "deleted elsewhere had the browser pane out of play, and this brought "
+        "it back fully lit on a page where nothing is live")
+
+
+def test_a_step_nobody_landed_stops_claiming_to_be_running():
+    """⛔ PRESS STOP WITH A CLICK IN FLIGHT AND THAT ROW BREATHED FOR EVER.
+
+    No result ever arrives for a step that was cancelled, and `land` is the only
+    thing that settles a row, so it kept `data-state="run"` - the breathing dot,
+    the present-tense verb - for the life of the page. A line in a log asserting
+    that something is happening, hours after it stopped.
+
+    The same pass found the other half: a row that FAILED was marked by colour
+    alone, `--err` mixed at 8% against the row, which is 1.12:1, and it carried
+    the same present-tense verb as a row still in flight. Scrolling back through
+    a ten minute run to find what went wrong, there was nothing to look for.
+
+    So the outcome is a word, and the past tense is kept for the one case that
+    earned it. Executed through the dispatcher, because the fact under test is
+    that the END OF A TURN settles a step nobody landed - a unit test of `close`
+    could not see a caller that never calls it.
+
+    Known-bad, three: drop the `if(live) close(...)` from the `busy 0` branch,
+    and the row stays in the running state; give a failed or stopped step the
+    past tense, and the log asserts the thing happened; drop the word and the
+    outcome is a tint again.
+    """
+    import json
+    import shutil
+    import subprocess
+
+    import pytest
 
     node = shutil.which("node")
     if not node:
-        pytest.skip("needs node to EXECUTE the publisher")
+        pytest.skip("needs node to EXECUTE the dispatcher")
 
-    src = CODE[CODE.index("function publishRailFloor("):]
-    src = src[:src.index(chr(10) + "}") + 2]
-    done = subprocess.run([node, "-e", src + chr(10) + "let set = {};\nglobalThis.window = {innerHeight: 900};\nglobalThis.innerHeight = 900;\nglobalThis.addEventListener = () => {};\nglobalThis.$ = id => id === 'f'\n  ? {getBoundingClientRect: () => ({top: 783.2, height: 83.4})}\n  : null;\nglobalThis.document = {documentElement: {style: {\n  setProperty(k, v){ set[k] = v; }}}};\nglobalThis.ResizeObserver = undefined;\npublishRailFloor();\nprocess.stdout.write(JSON.stringify({set}));"],
-                          capture_output=True, text=True,
+    def whole(start, end):
+        src = CODE[CODE.index(start):]
+        return src[:src.index(end) + len(end)]
+
+    harness = [
+        "globalThis.VERB = {browser_click: ['Clicking', 'Clicked']};",
+        "globalThis.el = (tag, cls, t) => ({tag, cls, t});",
+        "const made = () => {",
+        "  const lab = {b:{textContent:'Clicking'}, words:[],",
+        "    /* the row's own label, which `echoes` reads to decide whether the",
+        "       inline result says anything new */",
+        "    querySelector(sel){ return sel === 'b' ? this.b : null; },",
+        "    /* only the outcome word: `land` also appends the inline result */",
+        "    append(...xs){ for (const x of xs)",
+        "      if (x && x.cls === 'mark') this.words.push(x.t); }};",
+        "  const row = {querySelector: s => s === '.lab b' ? lab.b : lab,",
+        "               tabIndex: 0, lastElementChild:{textContent:''}};",
+        "  return {dataset:{name:'browser_click', state:'run'},",
+        "          firstElementChild: row, appendChild(){}, lab};",
+        "};",
+        "globalThis.timer = 0; globalThis.t0 = 0; globalThis.turn = null;",
+        "globalThis.queued = null; globalThis.LONG = 48;",
+        "globalThis.busyNow = true;",
+        "for (const name of ['clearInterval','flush','waiting','waited','put',",
+        "                    'drawChats','paint','settleOnce','newTurn','step',",
+        "                    'orphan','setQueued','send','rich'])",
+        "  globalThis[name] = () => {};",
+        "globalThis.performance = {now: () => 0};",
+        "globalThis.dur = () => '0ms';",
+        "",
+        "/* a turn that ends with a step still open: Stop, or a run that died */",
+        "const open = made(); globalThis.live = open;",
+        "onEvent({data: JSON.stringify({kind:'busy', text:'0'})});",
+        "const stopped = {state: open.dataset.state,",
+        "                 verb: open.lab.b.textContent, words: open.lab.words};",
+        "",
+        "/* and a step the server refused */",
+        "const bad = made(); globalThis.live = bad;",
+        "land('err', 'timeout', false);",
+        "const failed = {state: bad.dataset.state,",
+        "                verb: bad.lab.b.textContent, words: bad.lab.words};",
+        "",
+        "/* and one that actually worked */",
+        "const good = made(); globalThis.live = good;",
+        "land('result', 'ok', false);",
+        "const worked = {state: good.dataset.state, body: good.dataset.body,",
+        "                tab: good.firstElementChild.tabIndex,",
+        "                verb: good.lab.b.textContent, words: good.lab.words};",
+        "process.stdout.write(JSON.stringify({stopped, failed, worked}));",
+    ]
+
+    js = (whole("function echoes(", chr(10) + "}") + chr(10)
+          + whole("function close(", chr(10) + "}") + chr(10)
+          + whole("function land(", chr(10) + "}") + chr(10)
+          + whole("const onEvent =", chr(10) + "};") + chr(10)
+          + chr(10).join(harness))
+    done = subprocess.run([node, "-e", js], capture_output=True, text=True,
                           encoding="utf-8", timeout=30)
     assert done.returncode == 0, done.stderr
-    got = json.loads(done.stdout)["set"]
+    got = json.loads(done.stdout)
 
-    assert got.get("--rail-bottom") == "117px", (
-        "the floor the panel stops at is not the distance to the composer, "
-        "so it is right until the panes stack and the input moves: %r" % got)
+    assert got["stopped"]["state"] == "off", (
+        "the end of a turn leaves a step in the running state, so its dot goes "
+        "on breathing for the life of the page: %r" % (got["stopped"],))
+    assert got["stopped"]["verb"] == "Clicking", (
+        "a step that never finished is written in the past tense, which asserts "
+        "the thing happened: %r" % (got["stopped"],))
+    assert "stopped" in got["stopped"]["words"], (
+        "nothing but a colour says the step did not finish: %r"
+        % (got["stopped"],))
+
+    assert got["failed"]["state"] == "err" and got["failed"]["verb"] == "Clicking", (
+        "a failed step is written as though it had happened: %r" % (got["failed"],))
+    assert "failed" in got["failed"]["words"], (
+        "a failed step is marked by colour only, at 1.12:1, and reads with the "
+        "same verb as a step still running: %r" % (got["failed"],))
+
+    assert got["worked"]["state"] == "ok" and got["worked"]["verb"] == "Clicked", (
+        "a step that worked lost its past tense: %r" % (got["worked"],))
+    #: ⛔ AND A ROW WITH NOTHING TO OPEN LEAVES THE TAB ORDER. Every finished
+    #: step stayed a focusable disclosure, so crossing a fifty step run by
+    #: keyboard was fifty presses through rows where Enter opens nothing: the
+    #: distance between the sessions button and the composer was a minefield of
+    #: controls that do not control anything. Decided by the same statement that
+    #: decides the row has no body, so the two cannot drift apart.
+    assert got["worked"]["body"] == "none" and got["worked"]["tab"] == -1, (
+        "a step with its whole result on the row is still a tab stop that "
+        "opens nothing: %r" % (got["worked"],))
+    assert got["worked"]["words"] == [], (
+        "an ordinary result is annotated with an outcome word, which is noise "
+        "on the rows that make up most of a run: %r" % (got["worked"],))
+
+
+def test_the_queued_sentence_is_on_screen_and_survives_a_click():
+    """⛔ A SECOND ENTER DESTROYED THE FIRST SENTENCE, SILENTLY.
+
+    The chip read `1 message queued` - a literal in the markup - so the words
+    waiting to be sent were never drawn anywhere. Type a follow-up while the
+    agent works, think of a better wording, press Enter: the first one is gone,
+    with nothing on screen that ever showed it and no way back.
+
+    The same control destroyed work in the other direction. Clicking the chip to
+    see what was queued assigned over the composer, so a draft in the box was
+    overwritten by the queued text - from the one control whose whole purpose is
+    to give typed words back.
+
+    Executed, because both facts are about what `paint` and the click handler
+    DO: a scan can see the literal leave the markup and cannot see what replaces
+    it, which is how the string ended up in two places to begin with.
+
+    Known-bad, two: leave the count in the markup and do not write the sentence;
+    assign over `i.value` again and the draft is eaten.
+    """
+    import json
+    import shutil
+    import subprocess
+
+    import pytest
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("needs node to EXECUTE the composer")
+
+    paint = CODE[CODE.index("function paint(){"):]
+    paint = paint[:paint.index(chr(10) + "}") + 2]
+    click = CODE[CODE.index("chip.onclick = "):]
+    click = click[:click.index("; };") + 4]
+
+    harness = [
+        "const what = {textContent: ''};",
+        "globalThis.chip = {hidden: true, querySelector: () => what,",
+        "                   focus(){}};",
+        "globalThis.i = {value: '', placeholder: '',",
+        "                dispatchEvent(){}, focus(){}};",
+        "globalThis.go = {disabled:false, dataset:{}, setAttribute(){}};",
+        "globalThis.halt = {hidden:true};",
+        "globalThis.fresh = {disabled:false, setAttribute(){}};",
+        "globalThis.Event = function(){};",
+        "globalThis.queued = 'go to the second page and read the heading';",
+        "globalThis.busyNow = true;",
+        "globalThis.setQueued = (v) => { globalThis.queued = v; };",
+        "paint();",
+        "const shown = what.textContent;",
+        "/* a draft in the box, and the chip pressed to look at what is queued */",
+        "i.value = 'and stop before sending anything';",
+        "chip.onclick();",
+        "process.stdout.write(JSON.stringify({shown, box: i.value}));",
+    ]
+
+    #: the stubs first, then the code that binds to them, then the actions:
+    #: `chip.onclick = ...` runs the moment the script is evaluated.
+    at = harness.index("paint();")
+    js = (chr(10).join(harness[:at]) + chr(10) + paint + chr(10) + click
+          + chr(10) + chr(10).join(harness[at:]))
+    done = subprocess.run([node, "-e", js], capture_output=True, text=True,
+                          encoding="utf-8", timeout=30)
+    assert done.returncode == 0, done.stderr
+    got = json.loads(done.stdout)
+
+    assert got["shown"] == "go to the second page and read the heading", (
+        "the chip does not show the sentence it is holding, so replacing it is "
+        "invisible and what was lost cannot even be read: %r" % (got["shown"],))
+    assert "and stop before sending anything" in got["box"], (
+        "clicking the chip ate the draft in the box: %r" % (got["box"],))
+    assert "go to the second page" in got["box"], (
+        "clicking the chip did not give the queued sentence back: %r"
+        % (got["box"],))
+
+
+def test_the_browser_state_is_only_announced_when_it_changes():
+    """⛔ IT REWROTE THE PAGE'S LIVE REGION 25 TIMES A SECOND.
+
+    The frame pump calls `say` on every pass, and `say` wrote the state, the
+    word beside it and a title whether or not anything had changed. A screen
+    reader announces every one of those writes: the word `live`, over and over,
+    with the queue never emptying - so the one transition that matters, live to
+    error, could never be reached. Somebody using this product by ear was shut
+    out of it for exactly as long as it was working.
+
+    Guarded in `say` and not at the pump, because there are eight callers and
+    "the state changed" is one fact. Executed: the defect is not visible in the
+    text of a function that always wrote the same three properties.
+
+    Known-bad: drop the guard, or guard only the pump's call site.
+    """
+    import json
+    import shutil
+    import subprocess
+
+    import pytest
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("needs node to EXECUTE say()")
+
+    end = "stateEl.title = why || ''; }"
+    #: from the variable the guard keeps, not from the function: what has
+    #: been DRAWN is the thing being remembered, and slicing below it was
+    #: how the harness first reported a defect that was its own.
+    src = CODE[CODE.index("let shown = null;"):]
+    src = src[:src.index(end) + len(end)]
+
+    harness = [
+        "let writes = 0;",
+        "/* the markup declares the first state before any script runs, which is",
+        "   where the first version of this guard went wrong: it read the DOM,",
+        "   saw its own starting value, and swallowed the call that normalises",
+        "   the page. */",
+        "globalThis.right = {dataset: new Proxy({state: 'idle'}, {set(t, k, v){",
+        "  writes++; t[k] = v; return true; }})};",
+        "globalThis.stateEl = {textContent:'', title:'',",
+        "                      classList:{toggle(){}}};",
+        "/* the state the markup already declares: the call must still draw */",
+        "say('idle');",
+        "const normalised = writes;",
+        "/* the pump, a hundred passes of a browser that has not changed */",
+        "for (let k = 0; k < 100; k++) say('live');",
+        "const steady = writes;",
+        "say('offline', 'the stream closed');",
+        "const afterChange = writes;",
+        "/* and the same state with a different reason is a change too */",
+        "say('offline', 'reconnecting');",
+        "process.stdout.write(JSON.stringify({normalised, steady, afterChange,",
+        "                                     afterReason: writes}));",
+    ]
+
+    done = subprocess.run([node, "-e", src + chr(10) + chr(10).join(harness)],
+                          capture_output=True, text=True, encoding="utf-8",
+                          timeout=30)
+    assert done.returncode == 0, done.stderr
+    got = json.loads(done.stdout)
+
+    assert got["normalised"] == 1, (
+        "the first call is swallowed because the markup already declares that "
+        "state, so the page is never normalised: the word IDLE stays in bright "
+        "capitals in the corner of an empty room, which is what this guard "
+        "shipped with for one commit")
+    assert got["steady"] == 2, (
+        "a hundred passes of an unchanged browser wrote the live region %d "
+        "times, which a screen reader reads out %d times"
+        % (got["steady"] - 1, got["steady"] - 1))
+    assert got["afterChange"] == 3, (
+        "the guard swallowed a real change, which is the one thing it must "
+        "never do: %r" % (got,))
+    assert got["afterReason"] == 4, (
+        "the same state with a different reason was swallowed, so the word "
+        "explaining WHY it went offline never arrives: %r" % (got,))
+
+
+def test_the_one_input_on_the_page_keeps_its_focus_ring():
+    """⛔ FIRST THE INPUT HAD NO FOCUS RING; THEN IT HAD TWO. `#i{outline:none}`
+    beat `:focus-visible` on specificity, so the only way to talk to the agent
+    signalled the keyboard with a caret and nothing else. The first repair
+    scoped the removal to `:focus:not(:focus-visible)` - and on a textarea
+    `:focus-visible` matches on EVERY focus, a click included, because the
+    element takes keyboard input. So the page opened on two nested rectangles,
+    the accent ring on the field inside the bordered box, and drew them again
+    on every click. Found in the final screenshot pass, not by any assertion.
+
+    The visible control and the focusable element are two different boxes
+    here, which is the one place on the page where that is true. So the BOX
+    says it has the keyboard: a 2px ring at 3.92:1 on `.composer:focus-within`,
+    for everybody, and the field draws none of its own.
+
+    Known-bad, two: give the field a ring of its own again; drop the shadow and
+    leave a 1px border as the whole indicator.
+    """
+    import re
+
+    css = re.sub(r"/\*.*?\*/", "",
+                 PAGE[PAGE.index("<style>"):PAGE.index("</style>")], flags=re.S)
+    box = re.search(r"\.composer:focus-within\{([^}]*)\}", css)
+    assert box, "the composer no longer says it has the keyboard"
+    flat = box.group(1).replace(" ", "")
+    assert "box-shadow:" in flat and "0001pxvar(--fg-4)" in flat and "border-color:var(--fg-4)" in flat, (
+        "the composer's focus indicator is not a 2px ring at the documented "
+        "3.9:1 ink: %s" % " ".join(box.group(1).split()))
+
+    #: and the field draws nothing of its own, or the two stack.
+    own = [m for m in re.findall(r"#i[^{,]*\{([^}]*)\}", css)
+           if re.search(r"outline:(?!none)", m.replace(" ", ""))]
+    assert not own, (
+        "the field draws a ring of its own inside the box's, so a focused "
+        "composer is two nested rectangles: %s" % own)
+
+
+
+def test_clearing_the_conversation_leaves_the_page_able_to_explain_itself():
+    """⛔ CLEAR DELETED THE PRODUCT'S ONLY GUIDANCE OUT OF THE DOM FOR GOOD.
+
+    The three sentences that say what this is live in the markup and the first
+    turn removes them, which is right. `wipe()` emptied the transcript without
+    putting them back, so pressing Clear on a finished conversation left a void
+    - and the page had forgotten how to introduce itself until the tab was
+    reloaded.
+
+    Cloned from the markup rather than rebuilt in a builder: the same three
+    sentences written twice is the duplication that makes one of the two go
+    stale.
+
+    Known-bad: drop the restore from `wipe`, or write the sentences a second
+    time in the script instead of cloning the node.
+    """
+    import json
+    import shutil
+    import subprocess
+
+    import pytest
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("needs node to EXECUTE wipe()")
+
+    src = CODE[CODE.index("function wipe(){"):]
+    src = src[:src.index(chr(10) + "}") + 2]
+
+    harness = [
+        "let kids = ['a turn', 'another turn'];",
+        "globalThis.thread = {",
+        "  set textContent(v){ kids = []; },",
+        "  get firstElementChild(){ return kids.length ? kids[0] : null; },",
+        "  appendChild(n){ kids.push(n); }};",
+        "globalThis.hintNode = {cloneNode: () => 'the guidance'};",
+        "globalThis.turn = 1; globalThis.live = 1; globalThis.hold = 1;",
+        "globalThis.n = 3; globalThis.timer = 0; globalThis.busyNow = true;",
+        "globalThis.waited = () => {}; globalThis.setQueued = () => {};",
+        "globalThis.clearInterval = () => {};",
+        "wipe();",
+        "process.stdout.write(JSON.stringify({left: kids}));",
+    ]
+
+    done = subprocess.run([node, "-e", src + chr(10) + chr(10).join(harness)],
+                          capture_output=True, text=True, encoding="utf-8",
+                          timeout=30)
+    assert done.returncode == 0, done.stderr
+    got = json.loads(done.stdout)
+
+    assert got["left"] == ["the guidance"], (
+        "clearing the conversation leaves a pane with nothing in it, on a "
+        "product whose whole first-run explanation was what it just deleted: "
+        "%r" % (got["left"],))
+
+
+def test_pressing_stop_when_nothing_is_running_says_so():
+    """⛔ THE PANIC BUTTON ANSWERED `stopped:false` AND THE PAGE SAID NOTHING.
+
+    The server replies that there was nothing to stop whenever the page's idea
+    of the run is stale: a restarted server, a second tab that already stopped
+    it, a few seconds of lag. The press did nothing, said nothing, and left the
+    button offering to stop a run that had already ended - so the only reading
+    available to the person is that the product ignores its own stop.
+
+    And there was one request written twice, here and on the key, with the same
+    failure sentence: the half added to either one reached whichever path the
+    reader happened to be looking at. The key presses the button now.
+
+    `busyNow` is deliberately not written by this path. The event stream is its
+    one writer, and a second writer is how two places start disagreeing about
+    whether the agent is working.
+
+    Known-bad, three: stop reading the body; write the sentence for a successful
+    stop as well, which turns the ordinary case into noise; give the key its own
+    copy of the request again.
+    """
+    import json
+    import shutil
+    import subprocess
+
+    import pytest
+
+    #: one request, one sentence about it failing.
+    assert CODE.count("'/chat/stop'") == 1, (
+        "the stop is written %d times, so the next thing added to it reaches "
+        "one path and not the other" % CODE.count("'/chat/stop'"))
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("needs node to EXECUTE the stop")
+
+    src = CODE[CODE.index("halt.onclick = async"):]
+    src = src[:src.index("};") + 2]
+
+    harness = [
+        "let said = [];",
+        "globalThis.orphan = (kind, text) => said.push(kind + ': ' + text);",
+        "globalThis.halt = {};",
+        "globalThis.answer = {stopped: false};",
+        "globalThis.ask = async () => ({json: async () => answer});",
+        "HERE",
+        "(async () => {",
+        "  await halt.onclick();",
+        "  const nothing = said.slice();",
+        "  said = []; answer = {stopped: true};",
+        "  await halt.onclick();",
+        "  process.stdout.write(JSON.stringify({nothing, ordinary: said}));",
+        "})();",
+    ]
+    js = chr(10).join(harness).replace("HERE", src)
+
+    done = subprocess.run([node, "-e", js], capture_output=True, text=True,
+                          encoding="utf-8", timeout=30)
+    assert done.returncode == 0, done.stderr
+    got = json.loads(done.stdout)
+
+    assert len(got["nothing"]) == 1 and "nothing running to stop" in got["nothing"][0], (
+        "pressing stop on a run that had already ended says nothing at all, so "
+        "the press is indistinguishable from one that never arrived: %r"
+        % (got["nothing"],))
+    assert not got["nothing"][0].startswith("err"), (
+        "a stale page is reported to the person as an error, which is the same "
+        "defect as calling their own Stop a failure: %r" % (got["nothing"],))
+    assert got["ordinary"] == [], (
+        "an ordinary stop writes a line into the transcript, which is noise on "
+        "the path that works: %r" % (got["ordinary"],))
+
+
+def test_a_result_that_only_repeats_the_row_is_not_drawn_twice():
+    """⛔ THE MOST FREQUENT LINE IN THE PRODUCT SAID THE SAME WORDS TWICE. A
+    click answers `clicked <target>` and the row already reads `Clicked
+    <target>`, so a run of eighteen clicks was eighteen rows of the same four
+    words repeated across the line - in the owner's own screenshot, `clicked
+    [aria-label='continue']` twice on one row. An echo is not information, and
+    the owner had already asked for the noise to go.
+
+    Executed through `land`, because the decision reads the settled row - the
+    past-tense verb the row now carries and the target beside it - and a scan
+    cannot see what a row says after it has been settled.
+
+    Known-bad, two: drop the guard and the echo is back; compare against the
+    tool name instead of the row and a result that adds a status is hidden too.
+    """
+    import json
+    import shutil
+    import subprocess
+
+    import pytest
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("needs node to EXECUTE land")
+
+    def whole(start, end):
+        src = CODE[CODE.index(start):]
+        return src[:src.index(end) + len(end)]
+
+    harness = [
+        "globalThis.VERB = {browser_click: ['Clicking','Clicked'],",
+        "                   browser_navigate: ['Navigating','Navigated']};",
+        "globalThis.el = (tag, cls, t) => ({tag, cls, t});",
+        "const made = (name, target) => {",
+        "  const lab = {b:{textContent:''}, code:{textContent: target}, shown:[],",
+        "    querySelector(sel){ return sel === 'b' ? this.b : sel === 'code' ? this.code : null; },",
+        "    append(...xs){ for (const x of xs) if (x && x.cls === 'inline') this.shown.push(x.t); }};",
+        "  const row = {querySelector: s => s === '.lab b' ? lab.b : lab,",
+        "               tabIndex: 0, lastElementChild:{textContent:''}};",
+        "  return {dataset:{name, state:'run'}, firstElementChild: row, appendChild(){}, lab};",
+        "};",
+        "globalThis.timer = 0; globalThis.t0 = 0; globalThis.LONG = 48;",
+        "for (const name of ['clearInterval','orphan']) globalThis[name] = () => {};",
+        "globalThis.performance = {now: () => 0}; globalThis.dur = () => '0ms';",
+        "const out = {};",
+        "let d = made('browser_click', 'a:nth-of-type(1)'); globalThis.live = d;",
+        "land('result', 'clicked a:nth-of-type(1)', false); out.echo = d.lab.shown;",
+        "d = made('browser_click', '#buy'); globalThis.live = d;",
+        "land('result', 'Clicked #buy.', false); out.echoDressed = d.lab.shown;",
+        "d = made('browser_navigate', 'https://x'); globalThis.live = d;",
+        "land('result', 'navigated to https://x/ (HTTP 200)', false); out.news = d.lab.shown;",
+        "process.stdout.write(JSON.stringify(out));",
+    ]
+    js = (whole("function echoes(", chr(10) + "}") + chr(10)
+          + whole("function close(", chr(10) + "}") + chr(10)
+          + whole("function land(", chr(10) + "}") + chr(10)
+          + chr(10).join(harness))
+    done = subprocess.run([node, "-e", js], capture_output=True, text=True,
+                          encoding="utf-8", timeout=30)
+    assert done.returncode == 0, done.stderr
+    got = json.loads(done.stdout)
+
+    assert got["echo"] == [] and got["echoDressed"] == [], (
+        "a result that only repeats the row is drawn beside it, so the most "
+        "frequent line in the product says the same words twice: %r" % (got,))
+    assert got["news"] == ["navigated to https://x/ (HTTP 200)"], (
+        "a result that says more than the row - here a status - was hidden: %r"
+        % (got,))

@@ -30,7 +30,14 @@
     <path d="M9.2 4.4v15.2" stroke="currentColor" stroke-width="1.6"/>
   </svg></button>
 
-<nav id="rail" aria-labelledby="railtitle" hidden>
+<!-- ⛔ A DIALOG, BECAUSE THAT IS WHAT IT BEHAVES LIKE NOW. It lies over the
+     conversation and puts the two panes behind it out of play, which is a modal
+     whatever the element is called. `role` overrides the `nav` mapping, and
+     `aria-modal` is what tells a screen reader that the rest of the page is not
+     there for the moment - the half that `inert` does for everybody else. It
+     was a plain `nav` floating over live content, which announced a page where
+     everything was still reachable while a panel covered half of it. -->
+<nav id="rail" role="dialog" aria-modal="true" aria-labelledby="railtitle" hidden>
   <!-- No title here any more: the spine to the left of this column carries the
        word, and with the column open the two sat twenty pixels apart saying the
        same thing. The row keeps its height from its padding, so it still lines
@@ -47,6 +54,10 @@
            stroke-width="1.6" stroke-linecap="round"><path d="M9 3.5v11M3.5 9h11"/></svg>
     </button>
   </div>
+  <!-- Where this panel answers for itself: a refused rename, a delete the
+       server would not do. Empty until there is something to say, and emptied
+       again the next time the list is drawn. -->
+  <p id="railsay" role="status"></p>
   <div id="chats" role="list"></div>
 </nav>
 
@@ -62,7 +73,11 @@
          here. What was removed is the NAME ON THE SCREEN, which said the same
          thing as the tab, the window and the address bar. -->
     <h1 class="sr">AIHawk</h1>
-    <span class="badge" id="model">no model</span>
+    <!-- Empty and hidden until the server says which model: `no model` was a
+         literal here, a second declaration of a fact the server owns, and it
+         was on screen for the first second of every load as though it were
+         true. -->
+    <span class="badge" id="model" hidden></span>
     <span class="vr" aria-hidden="true"></span>
     <button id="fresh" type="button" title="Clear this conversation">Clear</button></div>
   <div id="log">
@@ -75,7 +90,7 @@
       <div id="hint">
         <p>Tell it what to do, in a sentence. It opens the pages, reads them and
            clicks, and you watch on the right.</p>
-        <p class="eg">Go to example.com and tell me the main heading.</p>
+        <button type="button" class="eg">Go to example.com and tell me the main heading.</button>
         <p class="sm">Plain language: the model works out the clicks. One
            instruction at a time works best.</p>
       </div>
@@ -89,7 +104,13 @@
          size, so at 200% with a queued message it landed on top of the thing
          it floats above. -->
     <button id="jump" hidden type="button">jump to latest</button>
-    <button id="chip" type="button" hidden>1 message queued
+    <!-- ⛔ THE SENTENCE ITSELF, NOT A COUNT OF SENTENCES. This read
+         `1 message queued`, a literal, so the one thing worth showing - the
+         words waiting to be sent - was the one thing never on screen. The
+         composer paints it, because the composer is the single writer of how
+         the composer looks. The hidden prefix keeps the button's name saying
+         what it is, without putting a word on screen that is not needed. -->
+    <button id="chip" type="button" hidden><span class="sr">Queued message: </span><span class="what"></span>
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"
            stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
            stroke-linejoin="round"><path d="M10.6 2.9l2.5 2.5L5.6 12.9 2.5 13.5l.6-3.1z"/></svg></button>
@@ -115,8 +136,16 @@
      the room is a property of the TASK - reading a long answer wants one
      ratio, watching a form being filled wants another - so it is not a number
      this file gets to decide once. -->
+<!-- ⛔ NO `aria-valuemin` ON THE SEPARATOR, AND NO COMMENT INSIDE ITS TAG.
+     The floor is a token the script reads, and a literal here would be a
+     second copy of it that nothing updates; the script writes all three
+     bounds on the first pass. The first version of this note sat BETWEEN the
+     attributes, where the `>` that ends a comment ends the start tag instead:
+     every attribute after it became visible text between the two panes,
+     `aria-label="Width of the conversation"` printed down the seam, with
+     577 tests green. Found by looking at a screenshot. -->
 <div id="split" role="separator" aria-orientation="vertical" tabindex="0"
-     aria-label="Width of the conversation" aria-valuemin="420"
+     aria-label="Width of the conversation"
      aria-valuenow="530"></div>
 
 <section id="right" data-state="idle" aria-label="The browsers this session holds">
@@ -134,9 +163,26 @@
       <button aria-pressed="false" data-v="hold" type="button"
               title="Stop updating the picture. The agent keeps working.">Frozen</button>
     </span>
-    <span id="state" class="label" aria-live="polite">idle</span>
+    <!-- ⛔ IT STARTS OFF-SCREEN, BECAUSE THE WORD IT STARTS WITH IS THE ONE
+         WORD NOT WORTH SHOWING. `idle` in capitals was the brightest thing
+         on a bar describing an empty room, and it was hidden by a CSS rule
+         keyed on the room being empty - a second place deciding what `say`
+         already decides, and the one that hid every OTHER word too: drop
+         the stream on a first run and `offline` landed in a box one pixel
+         wide. The rule is gone, so the starting state is drawn here the way
+         `say` would draw it, and the word stays for a screen reader. -->
+    <span id="state" class="label sr" aria-live="polite">idle</span>
   </div>
-  <div id="stage" data-grid="1"></div>
+  <!-- ⛔ THE EMPTY STATE SHIPS AS MARKUP, because the right half of the
+       window was a black rectangle from first paint until the browsers came
+       back: one round trip for the default conversation, seconds for any
+       other, because asking spawns a server process first. Half the product
+       showed nothing at all, under an armed toolbar, exactly while a new
+       user was deciding what this is. The script clones this node when it
+       needs it again, so the words are declared once. -->
+  <div id="stage" data-grid="1">
+    <div class="empty"><b>No browser open</b><span>Ask in the chat and one opens here. There is no button for it, on purpose.</span></div>
+  </div>
   <!-- role, or the label is ignored: a bare div takes no accessible name. -->
   <div id="thumbs" role="group" aria-label="The other browsers in this session"></div>
 </section>

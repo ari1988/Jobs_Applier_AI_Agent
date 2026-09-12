@@ -219,8 +219,15 @@ async def test_stop_cancels_a_run_in_flight_and_says_so():
             kinds.append(await asyncio.wait_for(q.get(), 1))
         except asyncio.TimeoutError:
             break
-    texts = [e["text"] for e in kinds if e["kind"] == "err"]
-    assert texts == ["stopped"], f"expected one 'stopped', got {kinds}"
+    # ⛔ AND IT IS NOT AN ERROR, WHICH IS WHAT THIS USED TO ASSERT. The person
+    # pressed the button: a deliberate, correct action was answered with a red
+    # box, announced to a screen reader as "error stopped", and any step in
+    # flight was flipped to the failed state. A `note` draws as an ordinary
+    # line, and the gate keeps the half that matters - it is SAID, once.
+    assert not [e for e in kinds if e["kind"] == "err"], (
+        f"stopping is reported to the person as a failure: {kinds}")
+    texts = [e["text"] for e in kinds if e["kind"] == "note"]
+    assert texts == ["Stopped."], f"expected one 'Stopped.', got {kinds}"
     # and the lock is released, or the next instruction would hang forever
     assert not svc._busy.locked()
 
@@ -332,8 +339,14 @@ async def test_the_stop_control_is_its_own_button_and_follows_the_run():
     assert "halt.hidden = !busyNow;" in page, \
         "the stop button is no longer tied to the run alone"
 
-    assert 'data-mode' not in page, \
-        "the send button has a mode again, which is how stop went missing before"
+    # The send button publishes a MODE again - send, queue, replace - and that
+    # is not the regression this line was written against: stop used to be one
+    # of those modes and vanished with it. What must hold is that stop is never
+    # among them, and that the dedicated button above still exists.
+    mode = page[page.index('const mode = '):]
+    mode = mode[:mode.index(';')]
+    assert 'stop' not in mode, \
+        'stop is a mode of the send button again, which is how it went missing before'
 
 
 async def test_the_live_view_never_causes_a_browser_to_start():

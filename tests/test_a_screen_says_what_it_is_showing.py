@@ -280,9 +280,62 @@ def test_an_empty_stage_says_what_to_do_about_being_empty():
 
     Known-bad: go back to naming the condition and stopping.
     """
-    code = re.sub(r"/\*.*?\*/", "", PAGE, flags=re.S)
-    assert "el('div','empty')" in code, "the empty stage is a screen with no picture again"
+    code = re.sub(r"/\*.*?\*/|<!--.*?-->", "", PAGE, flags=re.S)
+    # ⛔ AND IT IS THERE FROM THE FIRST PAINT, which is what this used to miss by
+    # asserting that the SCRIPT built the cell. Built in the script, the right
+    # half of the window was a near-black rectangle under an armed toolbar until
+    # `/live/browsers` answered: one round trip for the default conversation and
+    # seconds for any other, because asking spawns a server process first. Half
+    # the product showed nothing at all exactly while a new user was deciding
+    # what this is. So it ships as markup, and the script CLONES it - one
+    # declaration, in the place that draws before any request.
+    stage = code[code.index('id="stage"'):]
+    stage = stage[:stage.index("</div>")]
+    assert 'class="empty"' in stage, (
+        "the empty state is built by the script again, so the stage is blank "
+        "until the first answer comes back: %r" % stage[:120])
+    assert "emptyCell.cloneNode(true)" in code, (
+        "nothing puts the empty state back after a browser closes")
     assert "Ask in the chat and one opens here" in PAGE, \
         "the empty stage no longer says how a browser gets opened"
-    assert "open a browser and go to example.com" in PAGE, \
-        "the empty stage says to ask but not what asking looks like"
+    # ⛔ AND IT NO LONGER CARRIES AN EXAMPLE OF ITS OWN. The stage taught
+    # `open a browser and go to example.com` while the hint beside it taught
+    # `Go to example.com and tell me the main heading`: two halves of one
+    # page, two different first instructions. The hint keeps the one example
+    # and the stage says how a browser gets opened, which is its own job.
+    stage = PAGE[PAGE.index('id="stage"'):]
+    assert "<code>" not in stage[:stage.index("</div>")], \
+        "the stage teaches a second first instruction beside the one in the hint"
+    assert PAGE.count("Ask in the chat and one opens here") == 1, (
+        "the sentence is written in two places, which is how one of them goes "
+        "stale")
+
+
+def test_a_screen_is_named_by_its_action_and_described_by_its_state():
+    """⛔ THE NAME WAS WHATEVER WAS INSIDE THE BUTTON. A screen, a thumbnail
+    and a chip took their accessible name from their contents, so a screen
+    reader heard the address, the tag and the veil's sentence run together,
+    and `title` - which is never the name - carried the one word that said
+    what pressing does. And "not running" was a 6px ring with no text
+    equivalent anywhere.
+
+    The name is the action, the state is the description, and the veil that
+    already says the state on screen is what describes the control.
+
+    Known-bad, two: drop the label and let the contents be the name again;
+    drop the description and leave the veil unheard.
+    """
+    got = cells("""
+      const cell = screenFor({id: 'b-two', running: true, urls: ['http://x/']}, true);
+      const veil = cell.querySelector('.veil');
+      process.stdout.write(JSON.stringify({label: cell.attrs['aria-label'],
+        title: cell.title, describedBy: cell.attrs['aria-describedby'],
+        veilId: veil ? veil.id : null}));
+    """)
+    assert got["label"] == "Watch b-two", (
+        "a screen takes its name from its contents, so it is announced as the "
+        "address and the veil's sentence run together: %r" % (got,))
+    assert got["describedBy"] and got["describedBy"] == got["veilId"], (
+        "the veil says the state on screen and nothing points the control at "
+        "it, so the state is unheard: %r" % (got,))
+

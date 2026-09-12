@@ -37,6 +37,17 @@ let pend = null, pendTimer = 0;
 
 const dur = ms => ms < 1000 ? Math.round(ms) + 'ms' : (ms/1000).toFixed(1) + 's';
 
+/* ⛔ THE GUIDANCE IS KEPT, BECAUSE CLEAR USED TO DELETE IT FOR GOOD. It lives
+   in the markup and the first turn removes it, which is right - and `wipe()`
+   then left an empty pane with nothing in it at all, on a page whose entire
+   first-run explanation was those three sentences. Press Clear on a finished
+   conversation and the product forgot how to introduce itself until the tab was
+   reloaded.
+
+   A clone taken before anything can remove it, rather than the same words
+   written a second time in a builder: one declaration, and it is the markup. */
+const hintNode = $('hint').cloneNode(true);
+
 function newTurn(){
   const hint = $('hint'); if(hint) hint.remove();
   n = 0; turn = el('section','turn'); thread.appendChild(turn); return turn;
@@ -108,30 +119,80 @@ function step(text, replay){
   }
 }
 
+/* ⛔ THE THREE THINGS THAT SETTLE A STEP, IN ONE PLACE, because the end of a
+   turn has to settle a step that nobody landed. Press Stop with a click in
+   flight and no result ever arrives, so that row kept `data-state="run"` and
+   its breathing dot for the life of the page, under a verb in the present
+   tense saying it was still happening.
+
+   ⛔ AND THE OUTCOME IS A WORD, NOT A TINT. A failed row was marked by colour
+   alone - `--err` mixed at 8% against the row, 1.12:1 - and carried the SAME
+   present-tense verb as a row still running, so scrolling back through a ten
+   minute run to find what went wrong there was nothing to look for. In
+   greyscale, or for anybody who does not separate amber from salmon, the
+   failure was not marked at all.
+
+   Past tense only when it finished. `Navigated <address>` on a row that never
+   navigated is the worst kind of line a log can carry. */
+function close(d, state, word){
+  clearInterval(timer);
+  const s = d.firstElementChild;
+  d.dataset.state = state;
+  s.querySelector('.lab b').textContent =
+    (VERB[d.dataset.name] || ['Calling','Called'])[state === 'ok' ? 1 : 0];
+  if(word) s.querySelector('.lab').append(' ', el('span','mark', word));
+  return s;
+}
+
+/* Whether a result says nothing the row does not already say: the settled
+   verb plus the target, compared by words, case and a trailing full stop
+   aside. Read from the row itself rather than recomputed from the tool name,
+   so the two cannot disagree about what the row says. */
+function echoes(s, text){
+  const lab = s.querySelector('.lab');
+  const code = lab.querySelector('code');
+  const said = lab.querySelector('b').textContent + ' ' + (code ? code.textContent : '');
+  const flat = (x) => { x = x.toLowerCase().split(' ').filter(Boolean).join(' ');
+                        return x.endsWith('.') ? x.slice(0, -1) : x; };
+  return flat(text) === flat(said);
+}
+
 /* A result or an error folds into the step above it, which is what makes a step
    one unit carrying its target, its timing, its state and its own disclosure. */
 function land(kind, text, replay){
   clearInterval(timer);
   if(!live) return orphan(kind, text, replay);
-  const d = live, s = d.firstElementChild;
+  const d = live;
   live = null;
-  d.dataset.state = kind === 'err' ? 'err' : 'ok';
-  s.querySelector('.lab b').textContent =
-    (VERB[d.dataset.name] || ['Calling','Called'])[kind === 'err' ? 0 : 1];
+  const s = close(d, kind === 'err' ? 'err' : 'ok', kind === 'err' ? 'failed' : '');
   if(!replay) s.lastElementChild.textContent = dur(performance.now() - t0);
   /* Short output goes ON the row and the row stops being expandable. In an
      ordinary run most rows are then one line with the answer already visible,
      which is the difference between a list and a stack of accordions. */
+  /* On both branches: the row says its whole result on hover whether or not
+     it fits, so a result truncated on the row is readable without opening
+     anything. It used to be set only on the long branch. */
+  s.querySelector('.lab').title = text.slice(0, 400);
   if(text.length <= LONG && text.indexOf('\n') < 0){
-    d.dataset.body = 'none';
-    s.querySelector('.lab').append(' ', el('span','inline', text));
+    /* ⛔ AND IT LEAVES THE TAB ORDER WITH THE SAME STATEMENT THAT DECIDES IT
+       HAS NO BODY. Every finished step stayed a focusable disclosure, so a
+       keyboard user crossing a fifty step run pressed Tab fifty times through
+       rows where Enter opens nothing - the transcript between the sessions
+       button and the composer was a minefield of controls that do not
+       control anything. Still reachable by click and in a screen reader's
+       browse mode; only the sequential order gives it up. */
+    d.dataset.body = 'none'; s.tabIndex = -1;
+    /* ⛔ NOT WHEN IT ONLY REPEATS THE ROW. A click answers `clicked <target>`
+       and the row already reads `Clicked <target>`, so the most frequent line
+       in the product said the same four words twice - eighteen times in a
+       row on a real run, and in the owner's own screenshot. An echo is not
+       information. A result that says anything more than the row does, an
+       address with a status, a heading that was read, is still shown. */
+    if(!echoes(s, text)) s.querySelector('.lab').append(' ', el('span','inline', text));
   } else {
     /* Anything that does not fit keeps a body, so the chevron is present for
        exactly the rows that need it. */
     d.appendChild(el('pre','out', text));
-    /* And the row says it on hover too: nobody should have to open a
-       disclosure to find out whether it is worth opening. */
-    s.querySelector('.lab').title = text.slice(0, 400);
   }
 }
 

@@ -61,24 +61,32 @@
               transition:color 120ms ease-out }
 #mode button:hover:not([aria-pressed="true"]){ color:var(--fg-2) }
 #mode button[aria-pressed="true"]{ background:var(--top); color:var(--fg);
-                                    box-shadow:0 1px 2px rgba(0,0,0,.35) }
+                                    box-shadow:0 1px 2px var(--shade-1) }
 /* ⛔ A CONTROL THAT CANNOT DO ANYTHING DOES NOT LOOK READY. With no browser
    open, Live/Frozen, the layout picker and the address are three armed controls
    over an empty room: the bar looked identical whether the product was working
    or waiting to be told what to do. */
-#right[data-empty="1"] #url,
-#right[data-empty="1"] #mode{ opacity:.4 }
+/* ⛔ NEITHER LINE IS HERE ANY MORE, FOR TWO DIFFERENT REASONS. The picker
+   goes inert when the room is empty, and inert has one look, declared once in
+   the shell - a second opacity here was the second of the two numbers the
+   page used for "cannot be used". And the address is TEXT, not a control:
+   `opacity:.4` put `no page yet` at 2.13:1 on every first run, where the
+   `.dim` class the script already sets on an empty address reads at 6.6:1. Ink
+   for words, the shared rule for controls. */
 /* ⛔ AND `pointer-events` IS NOT A DISABLED STATE. It only stops the
    mouse: the five buttons kept their place in the tab order, kept the focus
    ring, and Enter still fired the handler - so a keyboard could operate five
    controls that look dead, and a screen reader announced them as ordinary
    enabled buttons. `inert` takes them out of both. */
 #right[data-empty="1"] #mode{ pointer-events:none }
-/* And the state word goes altogether: with nothing running it said IDLE, in
-   capitals, and was the brightest thing on a bar describing an empty room -
-   while the room itself already says what it is. */
-#right[data-empty="1"] #state{ position:absolute; width:1px; height:1px;
-                              overflow:hidden; clip-path:inset(50%) }
+/* ⛔ AND `idle` IS HIDDEN BY THE STATE ITSELF, NOT BY THE EMPTY ROOM. A rule
+   here clipped `#state` to one pixel whenever the pane was empty, which is
+   right for the word `idle` - capitals, the brightest thing on a bar describing
+   an empty room - and wrong for every other word that box can hold. Drop the
+   stream on a first run and `offline` was written into a clipped box: the
+   sighted user got a 7px dot changing colour, and nobody got the word. Two
+   places decided whether that word is worth showing; now the one that knows
+   WHICH word it is decides, in `say`. */
 
 /* The frame is solved from the available height, so a wide shot fills the width
    and a tall one fills the height. What is left over is stage, never a hole

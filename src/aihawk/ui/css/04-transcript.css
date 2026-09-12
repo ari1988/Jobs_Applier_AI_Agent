@@ -1,6 +1,14 @@
 /* ---------------- one turn ---------------- */
 .turn + .turn{ margin-top:var(--s6) }   /* between turns */
-.turn > * + *{ margin-top:var(--s3) }   /* inside a turn */
+/* ⛔ 20 AND NOT 12, BECAUSE THE SPACING SAID THE WRONG THING ABOUT WHAT
+   BELONGS TOGETHER. Two paragraphs of one answer are 16px apart, and the
+   answer sat 12px from the step row under it: a two-paragraph answer read as
+   two separate things and the step below read as part of the second one.
+   Raised here rather than lowering the paragraph gap - at the 1.6 leading
+   this file declares, 12px is under half a line and paragraphs stop
+   separating at all. The ladder is 4 / 8 / 16 / 20 / 24 / 32 and never goes
+   down as the things it separates get further apart. */
+.turn > * + *{ margin-top:var(--s5) }   /* inside a turn */
 /* A turn that has scrolled out of sight costs no layout and no paint. Chosen
    over hiding or removing old turns because it is the only one of the three
    that leaves the text findable with Ctrl+F and readable by a screen reader:
@@ -53,7 +61,9 @@ h3.md-h, h4.md-h, h5.md-h, h6.md-h{
    under it, which is a hierarchy only the weight was carrying. */
 h3.md-h{ font-size:var(--t-h1) }
 h4.md-h{ font-size:var(--t-h2); font-weight:600 }
-h5.md-h, h6.md-h{ font-size:var(--t-h3); font-weight:600; color:var(--fg-2) }
+/* h5 and h6 are dressed by the label rule in the token file: at the body's
+   size and face they were a dimmer paragraph, and the ladder had no slot
+   left for them that size and weight could carry. */
 /* A fenced block inside an answer is already inside the answer's indent, and
    `.out` carries its own for the tool output it was written for: the two
    stacked, so code sat a step to the right of the prose describing it. */
@@ -85,15 +95,18 @@ h5.md-h, h6.md-h{ font-size:var(--t-h3); font-weight:600; color:var(--fg-2) }
    whatever page the agent last read, and the browser it drives is right there.
    The address is printed next to them so an injected one is legible. */
 .lk  { color:var(--fg) }
-.href{ color:var(--fg-3); font:.75rem/1.5 var(--mono); overflow-wrap:anywhere }
+/* ⛔ `--t-mono`, THE SIZE THIS FILE'S OWN TOKEN NAMES FOR AN ADDRESS. It was hand-written at .75rem,
+   which made the printed address the SMALLEST type on the page - the one string that exists
+   so that an injected link can be read before it is trusted. */
+.href{ color:var(--fg-3); font:var(--t-mono)/1.5 var(--mono); overflow-wrap:anywhere }
 .href::before{ content:" " }
 /* ⛔ NO COLOURED BAR DOWN THE LEFT EDGE. A 2px stripe on a callout is the
    house style of every framework and belongs to none of them; a tint plus a
    hairline in the same hue says the same thing without the costume. */
 .orph  { display:flex; gap:8px; font-size:var(--t-mono); color:var(--err);
-         background:color-mix(in srgb, var(--err) 9%, transparent);
+         background:var(--err-fill);
          border-radius:var(--r-sm);
-         border:1px solid color-mix(in srgb, var(--err) 32%, transparent);
+         border:1px solid var(--err-edge);
          padding:6px 10px }
 
 /* ONE grid: every row on the same rails, so nothing shifts as text changes. */
@@ -110,10 +123,25 @@ h5.md-h, h6.md-h{ font-size:var(--t-h3); font-weight:600; color:var(--fg-2) }
    reading. */
 .lab { user-select:text; grid-column:2; min-width:0; overflow:hidden;
        text-overflow:ellipsis; white-space:nowrap; font-size:var(--t-mono) }
-.lab b   { font-family:var(--sans); font-weight:600; color:var(--fg) }  /* the verb */
-.lab code{ color:var(--accent) }                                        /* the object */
+/* ⛔ THE INK MOVED BETWEEN THESE TWO, AND THEY HAVE TO MOVE TOGETHER. The
+   accent is the page's ACTION colour - it is on the send button - and its most
+   frequent appearance on screen was the address in a step row, which is not an
+   action and is not a thing to press. The address is the object of the line and
+   now carries full ink; the verb steps back to the quieter one, because two
+   full-ink things in one row is no hierarchy at all. */
+.lab b   { font-family:var(--sans); font-weight:600; color:var(--fg-2) } /* the verb */
+.lab code{ color:var(--fg) }                                            /* the object */
 .lab .inline{ color:var(--fg-3) }                    /* a short result, on the row */
-.meta{ grid-column:3; white-space:nowrap; font-size:var(--t-label); color:var(--fg-3) }
+/* ⛔ SIX CHARACTERS OF ROOM, RESERVED, BECAUSE THE CLOCK GROWS WHILE IT RUNS.
+   The timing is written ten times a second and the column was sized to its
+   contents, so every time the number gained a digit - `5ms` to `58ms` to
+   `412ms` to `1.0s` - the label beside it lost about 6.6px and re-truncated
+   under the reader's eye, three times in the first second of every step. A
+   `ch` really is one character here: this is the mono face and it is tabular,
+   which is the one place in this file where that unit means what it looks
+   like. */
+.meta{ grid-column:3; white-space:nowrap; font-size:var(--t-label);
+       min-width:6ch; text-align:right; color:var(--fg-3) }
 
 /* The chevron is the row's own pseudo-element in its own track: no svg, no icon
    font, and it cannot shift the label when it turns. */
@@ -130,6 +158,21 @@ h5.md-h, h6.md-h{ font-size:var(--t-h3); font-weight:600; color:var(--fg-2) }
   width:6px; height:6px; border-radius:50%; background:var(--accent);
   animation:breathe 1.4s ease-in-out infinite }
 .ev[data-state="err"] .g{ color:var(--err) }
+/* ⛔ THE OUTCOME IN WORDS, because the tint that carried it alone measures
+   1.12:1 against the row and says nothing in greyscale. `failed` on a step the
+   server refused, `stopped` on one the end of the turn had to close because no
+   result ever came. The face is the prose one on purpose: it is a word being
+   read, not part of the address beside it. */
+.lab .mark{ font-family:var(--sans); font-size:var(--t-label) }
+.ev[data-state="err"] .lab .mark{ color:var(--err) }
+.ev[data-state="off"] .lab .mark{ color:var(--fg-3) }
+/* And the inline result of a failed step is the reason it failed: it read in
+   the same quiet grey as an ordinary answer. */
+.ev[data-state="err"] .lab .inline{ color:var(--err) }
+/* A step nobody landed. Not an error - Stop is a correct thing to press - so
+   it takes no red, only the end of the running state, which is what stops the
+   dot that was asserting work nobody was doing. */
+.ev[data-state="off"] .g{ color:var(--fg-3) }
 /* The wait between steps, wearing the same row as a step so the sequence does
    not change shape when the agent is thinking rather than acting. Its verb is
    muted, because nothing has happened yet and a bold one would claim it had. */
@@ -146,13 +189,15 @@ h5.md-h, h6.md-h{ font-size:var(--t-h3); font-weight:600; color:var(--fg-2) }
    places had `--err` and `--well` re-expanded as rgba by hand, which is seven
    surfaces that would keep the old hue the day either token moves. */
 .ev[data-state="err"] > .row{
-     background:color-mix(in srgb, var(--err) 8%, transparent);
-     box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--err) 30%, transparent) }
+     background:var(--err-fill);
+     box-shadow:inset 0 0 0 1px var(--err-edge) }
 
 .out{ margin:2px 0 var(--s2) var(--indent);
-      max-height:290px; max-height:15lh; overflow:auto; overscroll-behavior:contain;
+      max-height:15lh; overflow:auto; overscroll-behavior:contain;
       white-space:pre-wrap; overflow-wrap:anywhere;
-      font:.75rem/1.5 var(--mono); color:var(--fg-3);
+      /* And the opened detail is not SMALLER than the row that introduced
+         it: clicking to read something made the something harder to read. */
+      font:var(--t-mono)/1.5 var(--mono); color:var(--fg-3);
       background:var(--raised); border-left:2px solid var(--line-2);
       border-radius:0 var(--r-sm) var(--r-sm) 0; padding:8px 10px }
 

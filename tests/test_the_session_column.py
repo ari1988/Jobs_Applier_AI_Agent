@@ -684,3 +684,212 @@ def test_the_spine_is_part_of_the_frame_and_is_the_only_way_in():
     assert not hidden, (
         "%d rule(s) hide the sessions column or the only way into it: %s"
         % (len(hidden), hidden))
+
+
+def test_a_long_name_ends_in_an_ellipsis_instead_of_stopping_mid_word():
+    """⛔ THE RULE ASKED FOR THE ELLIPSIS AND THE DISPLAY MODE SWITCHED IT OFF.
+
+    `text-overflow` does nothing on a flex container: the text inside becomes an
+    anonymous flex item, and there is no line box for the ellipsis to hang off
+    the end of. So `.chat .nm` declared `text-overflow:ellipsis` next to
+    `display:flex` and a name that did not fit was simply cut through, mid-word,
+    with no mark. Measured on the running page 2026-09-12: a name overflowing
+    its box by 10px, `text-overflow` computing to `ellipsis` and doing nothing.
+    On screen it does not read as a long name, it reads as a broken row.
+
+    The gate is on the CLASS and not on the one selector, which is what this
+    project does with defects it has seen once: any rule that asks for the
+    ellipsis while laying its contents out as flex is the same mistake wearing a
+    different name.
+
+    Known-bad: put `display:flex` back into `.chat .nm`.
+    """
+    import re
+
+    css = re.sub(r"/\*.*?\*/", "",
+                 PAGE[PAGE.index("<style>"):PAGE.index("</style>")], flags=re.S)
+    both = []
+    for sel, decl in re.findall(r"([^{}]+)\{([^{}]*)\}", css):
+        flat = decl.replace(" ", "")
+        if "text-overflow:ellipsis" in flat and re.search(r"display:(inline-)?flex",
+                                                          flat):
+            both.append(sel.strip())
+    assert not both, (
+        "%d rule(s) ask for an ellipsis and lay their contents out as flex, "
+        "which switches it off - the text is cut mid-word instead: %s"
+        % (len(both), both))
+
+    #: and the rule that needs one still asks for it
+    nm = css[css.index(".chat .nm{"):]
+    assert "text-overflow:ellipsis" in nm[:nm.index("}")].replace(" ", ""), (
+        "the name in a session row no longer asks for an ellipsis at all")
+
+
+def test_the_panel_closes_the_three_ways_a_person_tries():
+    """⛔ IT COULD ONLY BE CLOSED BY THE 48px ICON THAT OPENED IT, and the key
+    everybody presses to dismiss an overlay STOPPED THE AGENT instead.
+
+    Measured on the running page 2026-09-12: Escape left the panel open and
+    reached the composer's handler, a click on the conversation behind it did
+    nothing, and choosing a conversation carried the panel across the navigation
+    so the page you had just asked for arrived already covered.
+
+    That is what made covering unacceptable rather than merely bold. A panel
+    that lies over the page and puts it out of play has to be one gesture away
+    from gone, and there are three gestures: the key, the click outside, and
+    picking the thing you opened it for.
+
+    Executed, because none of it can be read off the text: the handlers are
+    registered in capture on `document`, and what matters is the ORDER they run
+    in and which events they swallow. Escape while the panel is CLOSED must not
+    be swallowed - that key belongs to the composer, where it stops a run.
+
+    The spine case is the subtle one. `pointerdown` and `click` both fire on a
+    real press, so without the second guard the panel closes on the press and
+    the button's own handler reopens it on the click: the one control that opens
+    it could never close it.
+
+    Known-bad, four, all run: drop the `stopPropagation`, drop the `hidden`
+    check so a closed panel swallows Escape, drop the `railtab` guard in the
+    pointer handler, drop the `showRail(false)` on choosing a conversation.
+    """
+    import json
+    import re
+    import shutil
+    import subprocess
+
+    import pytest
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("needs node to EXECUTE the handlers rather than read them")
+
+    code = re.sub(r"/\*.*?\*/|<!--.*?-->", "", PAGE, flags=re.S)
+    owner = code[code.index("const heldBy = new WeakMap();"):]
+    owner = owner[:owner.index(chr(10) + "}") + 2]
+    panel = code[code.index("const RAILKEY"):]
+    panel = panel[:panel.index("async function renameChat(")]
+
+    harness = [
+        "const made = {};",
+        "const box = id => (made[id] = {id, hidden:false, inert:false,",
+        "  attrs:{}, kids:[],",
+        "  setAttribute(k, v){ this.attrs[k] = v; },",
+        "  getAttribute(k){ return this.attrs[k]; },",
+        "  contains(n){ return n === this || this.kids.indexOf(n) >= 0; },",
+        "  focus(){ globalThis.document.activeElement = this; }});",
+        "['rail','railtab','left','right','newchat','chats','f','railsay']",
+        "  .forEach(box);",
+        "made.rail.kids = [made.newchat, made.chats, made.railsay];",
+        "made.left.kids = [made.f];",
+        "globalThis.$ = id => made[id];",
+        "globalThis.document = {activeElement: made.railtab};",
+        "globalThis.drawChats = () => {};",
+        "globalThis.localStorage = {seen:{},",
+        "  setItem(k, v){ this.seen[k] = v; }, getItem(k){ return this.seen[k]; }};",
+        "const heard = [];",
+        "globalThis.addEventListener = (type, fn) => heard.push({type, fn});",
+        "HERE",
+        "let swallowed = 0;",
+        "const esc = () => ({key:'Escape', stopPropagation(){ swallowed++; }});",
+        "const fire = (type, ev) => { for(const l of heard)",
+        "                               if(l.type === type) l.fn(ev); };",
+        "const press = () => made.railtab.onclick();",
+        "const out = {closedOnLoad: made.rail.hidden};",
+        "fire('keydown', esc());",
+        "out.leavesEscapeAloneWhenClosed = swallowed === 0;",
+        "press(); out.opens = !made.rail.hidden;",
+        "fire('keydown', esc());",
+        "out.escapeCloses = made.rail.hidden;",
+        "out.swallowedWhileOpen = swallowed === 1;",
+        "press(); fire('pointerdown', {target: made.f});",
+        "out.aPressOutsideCloses = made.rail.hidden;",
+        "press(); fire('pointerdown', {target: made.newchat});",
+        "out.aPressInsideDoesNot = !made.rail.hidden;",
+        "/* a real press on the spine: pointerdown, then the button's own click */",
+        "fire('pointerdown', {target: made.railtab}); press();",
+        "out.theSpineStillCloses = made.rail.hidden;",
+        "process.stdout.write(JSON.stringify(out));",
+    ]
+    js = chr(10).join(harness).replace("HERE", owner + chr(10) + panel)
+
+    done = subprocess.run([node, "-e", js], capture_output=True, text=True,
+                          encoding="utf-8", timeout=30)
+    assert done.returncode == 0, done.stderr
+    got = json.loads(done.stdout)
+
+    assert got == {
+        "closedOnLoad": True,
+        "leavesEscapeAloneWhenClosed": True,
+        "opens": True,
+        "escapeCloses": True,
+        "swallowedWhileOpen": True,
+        "aPressOutsideCloses": True,
+        "aPressInsideDoesNot": True,
+        "theSpineStillCloses": True,
+    }, ("the panel cannot be dismissed the way a person expects, or it swallows "
+        "a key that is not its own: %r" % (got,))
+
+
+def test_the_only_way_into_the_sessions_is_visible_when_the_keyboard_reaches_it():
+    """⛔ ITS FOCUS RING WAS CLIPPED ON THREE SIDES AND THE SLIVER LEFT WAS THE
+    COLOUR OF THE LINE ALREADY THERE.
+
+    The strip is flush with the window on the left, the top and the bottom, so
+    the page's focus outline was drawn outside the viewport on all three: the
+    only visible segment was a 2px amber line about 2.5px from the permanent
+    amber hairline the strip already carries. Two similar marks side by side, on
+    the single keyboard route into the whole sessions feature.
+
+    An element-local exception to a global rule, which is the one kind of
+    exception worth having: the offset goes negative so the ring is drawn
+    INSIDE the strip, where there is room for it.
+
+    Known-bad: drop the offset and the ring goes back outside the window.
+    """
+    import re
+
+    css = re.sub(r"/\*.*?\*/", "",
+                 PAGE[PAGE.index("<style>"):PAGE.index("</style>")], flags=re.S)
+    rule = re.search(r"#railtab:focus-visible\{([^}]*)\}", css)
+    assert rule, (
+        "nothing pulls the focus ring inside the strip, so it is drawn outside "
+        "the window on three sides and what is left is a line beside a line")
+    offset = re.search(r"outline-offset:\s*(-?[\d.]+)px", rule.group(1))
+    assert offset and float(offset.group(1)) < 0, (
+        "the focus ring on the sessions button is not drawn inside it: %s"
+        % " ".join(rule.group(1).split()))
+
+
+def test_the_top_row_is_one_line_across_the_whole_app():
+    """⛔ THE ICON SAT 4.5px ABOVE THE LINE EVERYTHING ELSE SHARES. The drawer
+    title, the model chip and the address bar all centre on the same pixel; the
+    one control on the spine was pushed down by an 11px top padding and landed
+    just off it. Nobody names that miss and everybody reads it as unfinished,
+    and it is on the app's most visible seam. Measured after the fix in a real
+    browser at 1440px: icon, chip and title all on 27.5.
+
+    Centred by a grid row exactly one header tall, NOT by a margin computed from
+    the icon's size: that size is declared in the markup, and a rule that
+    repeated it here would let a redrawn icon un-centre itself silently while
+    both files still looked right.
+
+    Known-bad, two: put a top padding back on the strip; centre it with a margin
+    that names the icon's height.
+    """
+    import re
+
+    css = re.sub(r"/\*.*?\*/", "",
+                 PAGE[PAGE.index("<style>"):PAGE.index("</style>")], flags=re.S)
+    rule = css[css.index("#railtab{"):]
+    rule = " ".join(rule[:rule.index("}")].split())
+    assert "grid-template-rows:calc(var(--topbar)" in rule.replace(" ", ""), (
+        "the strip no longer centres its icon in a row one header tall: %s" % rule)
+    assert not re.search(r"(padding|margin)[^;]*[1-9]", rule), (
+        "the icon is positioned by a number again, so it is centred until "
+        "somebody changes the header or the icon: %s" % rule)
+    assert "24" not in rule, (
+        "the icon's drawn size is repeated in the stylesheet, so the markup and "
+        "this rule now both know it and only one of them will be updated: %s"
+        % rule)
+

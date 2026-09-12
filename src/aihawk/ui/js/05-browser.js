@@ -15,8 +15,28 @@ let frozen = false;
    one transition that matters, live to error, was silent for a screen reader
    precisely because the word had been redundant a moment earlier. Off-screen
    instead: the eye sees the tab it repeats, the ear still hears the change. */
-function say(s, why){ right.dataset.state = s; stateEl.textContent = s;
-                      stateEl.classList.toggle('sr', s === 'live' || s === 'frozen');
+/* ⛔ AND IT ONLY SPEAKS WHEN SOMETHING CHANGED. This rewrote a live region 25
+   times a second while a browser was being watched, because the frame pump
+   calls it on every pass. A screen reader announces every one of those writes:
+   the word `live`, forever, with the queue never emptying, so the one
+   transition that matters - live to error - could never be reached. Anybody
+   using this product by ear was locked out of it while it worked.
+
+   Guarded here rather than at the pump, because there are eight callers and
+   the fact "the state changed" is one fact. The early return is safe because
+   all three writes below are functions of the two arguments. */
+/* ⛔ AGAINST WHAT THIS FUNCTION HAS DRAWN, NOT AGAINST THE ATTRIBUTE. The first
+   version compared with `right.dataset.state`, which the MARKUP declares as
+   `idle` before any script runs - so the very first call was swallowed as a
+   repeat and the word never got the class that hides it. Caught by opening the
+   page: IDLE in bright capitals in the corner of an empty room, which is the
+   exact thing a rule deleted in the same change had been there to prevent. A
+   guard that reads the DOM cannot tell "already drawn" from "never drawn". */
+let shown = null;
+function say(s, why){ if(shown === s && stateEl.title === (why || '')) return;
+                      shown = s;
+                      right.dataset.state = s; stateEl.textContent = s;
+                      stateEl.classList.toggle('sr', s === 'live' || s === 'frozen' || s === 'idle');
                       stateEl.title = why || ''; }
 async function reason(r){ try { return (await r.json()).error || ''; } catch(err) { return ''; } }
 
