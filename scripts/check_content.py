@@ -618,7 +618,7 @@ def selftest():
         # The README is the source the fifth check reads: one block, one
         # launcher, the same shape as the real page.
         (root / "README.md").write_bytes(
-            b"# AIHawk\n\nWindows, in PowerShell:\n\n```powershell\n"
+            b"# invisible_playwright_mcp\n\nWindows, in PowerShell:\n\n```powershell\n"
             b'powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"\n'
             b'$env:Path = "$env:USERPROFILE\\.local\\bin;$env:Path"\n'
             b"uvx aihawk ui --openrouter-key sk-or-...\n"
@@ -629,11 +629,11 @@ def selftest():
             b"```\n\n"
             # The client lines, one route per client, as the real page has
             # them: what the eighth part of the fifth check reads.
-            b"```bash\nclaude plugin marketplace add feder-cr/aihawk_mcp_server\n"
+            b"```bash\nclaude plugin marketplace add feder-cr/invisible_playwright_mcp\n"
             b"claude plugin install aihawk@feder-cr\n```\n\n"
-            b"```bash\ncodex plugin marketplace add feder-cr/aihawk_mcp_server\n"
+            b"```bash\ncodex plugin marketplace add feder-cr/invisible_playwright_mcp\n"
             b"codex plugin add aihawk@feder-cr\n```\n\n"
-            b"```bash\ngemini extensions install https://github.com/feder-cr/aihawk_mcp_server\n```\n")
+            b"```bash\ngemini extensions install https://github.com/feder-cr/invisible_playwright_mcp\n```\n")
 
         bad = {
             "banned topic": ("docs/spam.md",
@@ -730,7 +730,7 @@ def selftest():
             "allowed history line": ("docs/ai-browser-agent-open-source.md",
                                      b"it began as a job-application bot\n"),
             "prose verb": ("docs/verb.md",
-                           b"what can AIHawk do for research\n"),
+                           b"what can invisible_playwright_mcp do for research\n"),
             # The three cases the first draft wrongly accused: a tool that
             # exists, a PARAMETER shaped like one, and a name that is not our
             # tool but another server's.
@@ -782,9 +782,9 @@ def selftest():
             # accused the README of running `install aihawk`.
             "the README's client lines, verbatim": (
                 "docs/plugin.md",
-                b"```bash\nclaude plugin marketplace add feder-cr/aihawk_mcp_server\n"
+                b"```bash\nclaude plugin marketplace add feder-cr/invisible_playwright_mcp\n"
                 b"claude plugin install aihawk@feder-cr\n```\n"
-                b"```bash\ngemini extensions install https://github.com/feder-cr/aihawk_mcp_server\n```\n"),
+                b"```bash\ngemini extensions install https://github.com/feder-cr/invisible_playwright_mcp\n```\n"),
             "a route the README teaches, named bare in prose": (
                 "docs/noun.md",
                 b"one `claude plugin install` command, once, and the tools are there\n"),

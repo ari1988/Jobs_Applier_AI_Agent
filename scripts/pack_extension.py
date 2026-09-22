@@ -2,7 +2,7 @@
 one that carries what it must not.
 
 Installed from the git URL, the extension is a clone of the whole repository:
-measured 2026-09-21, `gemini extensions install https://github.com/feder-cr/aihawk_mcp_server`
+measured 2026-09-21, `gemini extensions install https://github.com/feder-cr/invisible_playwright_mcp`
 put docs, articles, tests and src on the person's disk to deliver two files,
 `gemini-extension.json` and the setup skill. Gemini CLI installs from a
 GitHub release instead when the Latest release carries an asset it can pick:
@@ -31,7 +31,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 #: the skill it lists, and the three files a person expects to find beside any
 #: package. Nothing that runs: the server comes from the index, `uvx aihawk`.
 ALLOWED = ("gemini-extension.json", "skills/", "LICENSE", "README.md",
-           "assets/aihawk-icon-400.png")
+           "assets/icon-400.png")
 #: Names that must not appear anywhere in an archive path, whatever the prefix.
 FORBIDDEN_PARTS = (".env", ".git", "__pycache__", "tests", "docs", "articles", "src", "scripts")
 #: The platform names Gemini CLI matches assets on (Node's `process.platform`).

@@ -1,4 +1,4 @@
-# Contributing to AIHawk
+# Contributing to invisible_playwright_mcp
 
 Thanks for being here. This page says what this repository is, so you can tell in
 one minute whether your change belongs here or in one of the packages below.
@@ -9,7 +9,7 @@ The `aihawk` package: the two-pane interface, the loop that turns a sentence int
 browser actions, the command line around both, and, under `aihawk.mcp`, the MCP server the interface drives. If you are changing what a
 person sees, or how the model decides what to do next, it is here.
 
-What is NOT here is the browser engine. AIHawk does not drive Firefox directly - it
+What is NOT here is the browser engine. invisible_playwright_mcp does not drive Firefox directly - it
 talks to an MCP server over MCP, using the same tools any other client
 gets. That is deliberate and it is the thing to understand before changing
 anything: this interface has no privileged path to the page, so a browser
@@ -39,8 +39,8 @@ If you are not sure, open the issue here and it will be moved.
 ## Development setup
 
 ```bash
-git clone https://github.com/feder-cr/aihawk_mcp_server.git
-cd AIHawk
+git clone https://github.com/feder-cr/invisible_playwright_mcp.git
+cd invisible_playwright_mcp
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -e ".[test]"
@@ -80,7 +80,7 @@ picture was the only thing that noticed.
 
 ## Opening an issue
 
-Use one of the [templates](https://github.com/feder-cr/aihawk_mcp_server/issues/new/choose).
+Use one of the [templates](https://github.com/feder-cr/invisible_playwright_mcp/issues/new/choose).
 Before you do, search the open and closed issues.
 
 For a bug, the two things that decide how fast it can be answered are the exact

@@ -11,8 +11,8 @@ DEFAULT_MODEL = "z-ai/glm-5.3-flash"
 #: them every request is anonymous traffic on the key, so the app appears
 #: nowhere however much it is used. They are constants rather than settings
 #: because they name THIS package, not the person running it.
-APP_URL = "https://github.com/feder-cr/aihawk_mcp_server"
-APP_TITLE = "AIHawk"
+APP_URL = "https://github.com/feder-cr/invisible_playwright_mcp"
+APP_TITLE = "invisible_playwright_mcp"
 
 
 def resolve_key(explicit: str | None, env: Mapping[str, str]) -> str:

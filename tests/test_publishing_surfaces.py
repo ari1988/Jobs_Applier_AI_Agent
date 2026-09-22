@@ -118,7 +118,7 @@ SETUP_SKILL = "skills/setup/SKILL.md"
 MCP_FILES = ("mcp.json", ".mcp.json")
 LAUNCH = {"command": "uvx", "args": ["aihawk"]}
 #: The marketplace this repository IS, so `claude plugin marketplace add
-#: feder-cr/aihawk_mcp_server` needs no catalog kept by anybody else: one entry, whose
+#: feder-cr/invisible_playwright_mcp` needs no catalog kept by anybody else: one entry, whose
 #: source is the repository root, because the plugin is the repository. Held
 #: here because it repeats the package name, the description and the author,
 #: and because the README's install line names `<plugin>@<marketplace>`: the
@@ -357,7 +357,7 @@ BUNDLE_LAUNCH = {"command": "uv", "args": ["run", "--directory", "${__dirname}",
 #: Paths the bundle must not carry, each named in .mcpbignore. The archive
 #: check in scripts/pack_bundle.py is the second wall; this is the first.
 MUST_IGNORE = (".git/", ".github/", ".env", "tests/", "skills/", "docs/", "articles/", "scripts/",
-               "assets/*", "!assets/aihawk-icon-400.png", "plugin.json", "mcp.json",
+               "assets/*", "!assets/icon-400.png", "plugin.json", "mcp.json",
                ".mcp.json", "gemini-extension.json", "server.json",
                ".claude-plugin/", ".codex-plugin/", ".agents/")
 
